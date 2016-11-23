@@ -89,7 +89,7 @@ int main(int argc, char* argv[]){
 	MSG m;
     //memset(m,0,sizeof(MSG));
 	m.length = WELLCOME_SIZE;
-    
+    m.opcode = WELLCOME;
 	strncpy(m.msg, WELLCOME_MSG, m.length);
 
 	// hello string message

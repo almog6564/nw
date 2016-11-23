@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 
 
 #include "nw.h"
@@ -13,7 +14,7 @@
 
 
 // got size of wellcome but not message
-
+int clientProtocol(SOCKET);
 
 int getWelcome(SOCKET s){
 
@@ -29,7 +30,10 @@ int getWelcome(SOCKET s){
     //check if welcome is correct
 
     welcome.msg[welcome.length - 1] = '\0';       //sanity
-
+    if(welcome.opcode != WELLCOME){
+        printf("Not a wellcome message\n");
+        return -1;
+    }
     printf("%s\n",welcome.msg);
     return 0;
 
@@ -81,12 +85,9 @@ int initClient(char* hostname,int port){
 
     //printf("got freeaddrinfo\n");
 
-    status = getWelcome(s);
+    status = clientProtocol(s);
 
-    if(status < 0){
-        printf("getWelcome error\n");
-        return -1;
-    }
+    
     //status = startService(s);
 
     if(close(s)<0){
@@ -95,6 +96,106 @@ int initClient(char* hostname,int port){
     }
 
     return status;
+
+}
+
+
+int userLogin(SOCKET s){
+    int  status = 0;
+    char input[MAX_LOGIN];
+    char username[50];
+    char password[50];
+
+    /*USERNAME*/
+    memset(input,0,MAX_LOGIN);
+    fflush(stdout);
+    fgets(input,MAX_LOGIN,stdin);
+    input[strlen(input)-1] = '\0';
+        
+    if(!strncmp(input,"User: ",)){
+        strcpy(username,input+6);
+    } else{
+        printf("Error while getting username");
+        return -1;
+    }
+    /***/
+
+    /*PASSWORD*/
+    memset(input,0,MAX_LOGIN);
+    fflush(stdout);
+    fgets(input,MAX_LOGIN,stdin);
+    input[strlen(input)-1] = '\0';
+        
+    if(!strncmp(input,"Password: ",)){
+        strcpy(password,input+10);
+    } else{
+        printf("Error while getting password");
+        return -1;
+    }
+    /***/
+    MSG loginMsg;
+    loginMsg.opcode = LOGIN;
+    loginMsg.length = strlen(username)+strlen(password)+2;
+    strncpy(loginMsg.msg,username,strlen(username)+1);
+    strncpy(loginMsg.msg+strlen(username)+1,password,strlen(password)+1);
+
+    status = sendMessage(s,&loginMsg);
+    if(status<0){
+        printf("Error while sending login message");
+        return -1;
+    }
+
+    MSG loginStatus;
+        
+    status = getMessage(s, &loginStatus);
+    if(status < 0)
+    {
+        printf("Error while getting login status\n");
+        return -1;
+    }
+
+    if(loginStatus.opcode != LOGIN_SUCCESS){
+        printf("Connected to server\n");
+        return 0;
+    } 
+
+    if(loginStatus.opcode != LOGIN_FAIL){
+        printf("Username or password incorrect\n");
+    else
+        printf("Error while getting login status\n");
+        
+    return -1;
+
+}
+
+
+int clientProtocol(SOCKET s){
+    int  status = 0;
+    char input[MAX_INPUT];
+    
+    status = getWelcome(s); 
+
+    if(status < 0){
+        printf("getWelcome error\n");
+        return -1;
+    }
+
+    status = userLogin(s);
+    if(status < 0){
+        printf("Error while login\n");
+        return -1;
+    }
+    while(1){
+        memset(input,0,MAX_INPUT);
+        fflush(stdout);
+        fgets(input,MAX_INPUT,stdin);
+        input[strlen(input)-1] = '\0';
+        
+
+
+
+    }
+
 
 }
 

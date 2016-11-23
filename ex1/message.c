@@ -44,13 +44,20 @@ int getBuffer(SOCKET s,void* buff,int len){
 
 int getMessage(SOCKET s, MSG* message){
 
-    int chk = getBuffer(s,&message->length,LENGTH_SIZE);
-    
-    if(chk <= 0)
+    int chk = getBuffer(s,&message->opcode,LENGTH_SIZE);
+     if(chk <= 0)
     {
         printf("error getBuffer\n");
         return chk;
     }
+        chk = getBuffer(s,&message->length,LENGTH_SIZE);
+     if(chk <= 0)
+    {
+        printf("error getBuffer\n");
+        return chk;
+    }
+   
+    message->opcode = ntohs(message->opcode);
     message->length = ntohs(message->length);   //so it would be BIG endian
     //printf("message length = %d\n", message->length);
 
@@ -65,17 +72,19 @@ int getMessage(SOCKET s, MSG* message){
 
 int sendMessage(SOCKET s, MSG* message){
 
-    int sendSize   = LENGTH_SIZE + message->length;
+    int sendSize   = 2*LENGTH_SIZE + message->length;
     int leftToSend = sendSize;
 
     int tot        = 0;
     int sent;
 
     MSG copy;
+    copy.opcode =  htons(message->opcode);
     copy.length =  htons(message->length);
     memcpy(copy.msg,message->msg,message->length);
 
     message->length = htons(message->length);
+    message->opcode = htons(message->opcode);
 
     while(tot<sendSize){
          
