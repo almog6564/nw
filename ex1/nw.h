@@ -48,13 +48,15 @@ typedef struct {
     char    password[MAX_LEN];
 } USER;
 
+#pragma pack(push,1)
 typedef struct {
     char    from[MAX_LEN];
-    char    to[MAX_LEN];
+    char    to[TOTAL_TO];
+    short   toLen;
     char    subject[MAX_SUBJECT];
     char    text[MAX_CONTENT];
 } MAIL;
-
+#pragma pack(pop)
 
 
 typedef struct {
@@ -64,5 +66,7 @@ typedef struct {
 
 
 
+
+#define UnknownCommand()    printf("Unknown Command\n");    return -1;
 
 #endif

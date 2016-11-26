@@ -181,17 +181,59 @@ int showInbox(SOCKET s){
     
     status = sendMessage(s,&cmnd);
     if(status<0){
-        printf("send Show Inbox command failed\n");
+        printf("Sending show Inbox command failed\n");
         return -1;
     }
     MSG inbox;
     status = getMessage(s,&inbox);
     if(status<0){
-        printf("send Show Inbox command failed\n");
+        printf("Getting message command failed\n");
+        return -1;
+    }
+    if(inbox.length>0)
+        printf("%s",inbox.msg);
+    else{
+        printf("ERror while showing inbox\n");
         return -1;
     }
 
     return 0;
+}
+
+int getMail(SOCKET s, char* mailID){
+    int status = 0;
+    MSG cmnd;
+    cmnd.opcode = GET_MAIL;
+    cmnd.length = strlen(user.username)+strlen(mailID)+2;
+    strcpy(cmnd.msg,user.username);
+    strcpy(cmnd.msg+strlen(user.username)+1,mailID);
+    status = sendMessage(s,&cmnd);
+
+    if(status<0){
+        printf("Sending getMail command failed\n");
+        return -1;
+    }
+    MSG mailMSG;
+    status = getMessage(s,&mailMSG);
+    if(status<0){
+        printf("Getting message command failed\n");
+        return -1;
+    }
+    if(mailMSG.opcode = INVALID){
+        printf("Invalid mail ID.\n");
+        return 0;
+    }
+    MAIL mail = (MAIL) mailMSG.msg;
+    printf("From: %s\n");
+    printf("To: \n")
+    for(int i=0;i<mail.toLen;i++){
+        printf("%s",mail.to[i]);
+        if(i != mail.toLen -1)
+        printf(",");
+    }
+    printf("Subject: %s\nText: %s\n",mail.subject,mail.text);
+    return 0;
+
 }
 
 
@@ -218,16 +260,20 @@ int clientProtocol(SOCKET s){
         fgets(input,MAX_INPUT,stdin);
         input[strlen(input)-1] = '\0';
         if(!strcmp(input,"SHOW_INBOX")){
-            status = showInbox(s);
-          
+            if(showInbox(s)<0){
+                printf("Error while getting inbox\n");
+                return -1;
+            }
         }
-       
-
-
-
+        else if(!strncmp(input,"GET_MAIL",8)){
+            if(strlen(input)<10)
+                UnknownCommand()
+            if(getMail(s,input+9)){
+                printf("Error while getting mail\n");
+                return -1;
+            }
+        }
     }
-
-
 }
 
 
