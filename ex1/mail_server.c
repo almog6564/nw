@@ -9,6 +9,30 @@
 #include <stdio.h>
 #include "message.h"
 
+#define MAX_LEN 50
+#define MAX_USERS 20
+#define LINE_LEN 1000
+
+typedef struct {
+    char username[MAX_LEN];
+    char password[MAX_LEN];
+} USER;
+
+USER usersList[MAX_USERS];
+
+int createUsersList(cahr* path){
+    char line[LINE_LEN];
+    int i = 0;    
+    File* fp = fopen(path, "r");
+    
+    while (fgets(line, sizeof(line), file) != NULL){
+        sscanf(line, "%s %s", usersList[i].username, usersList[i].password); // TODO Error?
+        i++;
+    {
+    
+    return 0;
+}
+
 int initServer(int port){
 
     SOCKET sock = socket(PF_INET,SOCK_STREAM,0);
