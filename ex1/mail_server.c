@@ -9,27 +9,24 @@
 #include <stdio.h>
 #include "message.h"
 
-#define MAX_LEN 50
-#define MAX_USERS 20
-#define LINE_LEN 1000
 
-typedef struct {
-    char username[MAX_LEN];
-    char password[MAX_LEN];
-} USER;
+USERLIST lst;
 
-USER usersList[MAX_USERS];
-
-int createUsersList(cahr* path){
+int createUsersList(char* path){
+    memset(&lst,0,sizeof(lst));
     char line[LINE_LEN];
     int i = 0;    
-    File* fp = fopen(path, "r");
-    
-    while (fgets(line, sizeof(line), file) != NULL){
-        sscanf(line, "%s %s", usersList[i].username, usersList[i].password); // TODO Error?
+    FILE* fp = fopen(path, "r");
+    if(!fp){
+        printf("Error while opening users file");
+        return -1;
+    }
+    while (fgets(line, sizeof(line), fp) != NULL && i < MAX_USERS){
+        sscanf(line, "%s %s", lst.list[i].username, lst.list[i].password); // TODO Error?
         i++;
-    {
-    
+        lst.size++;
+    }
+    fclose(fp);
     return 0;
 }
 
@@ -80,31 +77,42 @@ int initServer(int port){
 
 int main(int argc, char* argv[]){
 	
-	//check arguments
+	
+    for(int i=0;i<lst.size;i++){ 
+        printf("User: %s,\tPassword: %s\n",lst.list[i].username,lst.list[i].password);
+    }
+
+
+    //check arguments
 	int status = 0;
     int port = PORT;
-
-/*
 	switch(argc){
-		case 2:
-		//only users_file;
-		break;
 		
 		case 3:
-		//users_file + port
-		break;
+		port = atoi(argv[2]);
 		
+        case 2:
+		status = createUsersList(argv[1]);
+        if(status<0){
+            printf("Failed to get users list\n");
+            return -1;
+        }
+        
+        for(int i=0;i<lst.size;i++){ 
+            printf("User: %s,\tPassword: %s\n",lst.list[i].username,lst.list[i].password);
+        }
+
+		break;
+
 		default:
-		//wrong arguments
-		break;
-		
+		printf("Invalid arguments.\nTry: mail_server users_file [port]\n");
+        return -1;
 			
 	}
-*/
 
 	SOCKET s = initServer(port);
 	if(s < 0){
-        printf("initServer error");
+        printf("Error while initalizing the mail server\n");
         return -1;
 }
     //we have a client!
@@ -119,5 +127,8 @@ int main(int argc, char* argv[]){
 	// hello string message
 	status = sendMessage(s, &m);
     
+
+
 	return status;
+    
 }

@@ -12,6 +12,7 @@
 #include "nw.h"
 #include "message.h"
 
+USER user;
 
 // got size of wellcome but not message
 int clientProtocol(SOCKET);
@@ -112,7 +113,7 @@ int userLogin(SOCKET s){
     fgets(input,MAX_LOGIN,stdin);
     input[strlen(input)-1] = '\0';
         
-    if(!strncmp(input,"User: ",)){
+    if(!strncmp(input,"User: ",6)){
         strcpy(username,input+6);
     } else{
         printf("Error while getting username");
@@ -126,13 +127,16 @@ int userLogin(SOCKET s){
     fgets(input,MAX_LOGIN,stdin);
     input[strlen(input)-1] = '\0';
         
-    if(!strncmp(input,"Password: ",)){
+    if(!strncmp(input,"Password: ",10)){
         strcpy(password,input+10);
     } else{
         printf("Error while getting password");
         return -1;
     }
     /***/
+    strcpy(user.username,username) ;
+    strcpy(user.password,password); 
+
     MSG loginMsg;
     loginMsg.opcode = LOGIN;
     loginMsg.length = strlen(username)+strlen(password)+2;
@@ -159,13 +163,35 @@ int userLogin(SOCKET s){
         return 0;
     } 
 
-    if(loginStatus.opcode != LOGIN_FAIL){
+    if(loginStatus.opcode != LOGIN_FAIL)
         printf("Username or password incorrect\n");
     else
         printf("Error while getting login status\n");
         
     return -1;
 
+}
+
+int showInbox(SOCKET s){
+    int status = 0;
+    MSG cmnd;
+    cmnd.opcode = SHOW_INBOX;
+    cmnd.length = strlen(user.username)+1;
+    strcpy(cmnd.msg,user.username);
+    
+    status = sendMessage(s,&cmnd);
+    if(status<0){
+        printf("send Show Inbox command failed\n");
+        return -1;
+    }
+    MSG inbox;
+    status = getMessage(s,&inbox);
+    if(status<0){
+        printf("send Show Inbox command failed\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 
@@ -185,12 +211,17 @@ int clientProtocol(SOCKET s){
         printf("Error while login\n");
         return -1;
     }
+    
     while(1){
         memset(input,0,MAX_INPUT);
         fflush(stdout);
         fgets(input,MAX_INPUT,stdin);
         input[strlen(input)-1] = '\0';
-        
+        if(!strcmp(input,"SHOW_INBOX")){
+            status = showInbox(s);
+          
+        }
+       
 
 
 
