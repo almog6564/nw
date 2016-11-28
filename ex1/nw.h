@@ -1,7 +1,6 @@
 #ifndef NW_H_
 #define NW_H_
 
-
 #define LENGTH_SIZE     sizeof(short)
 #define HOST            "localhost"
 #define PORT            6423
@@ -20,52 +19,48 @@
 
 typedef int SOCKET;
 
-typedef struct  {
-    short  opcode;
-    short  length;
-    char   msg[MAXSIZE];
+typedef struct {
+	short opcode;
+	short length;
+	char msg[MAXSIZE];
 } MSG;
 
-typedef enum    {
-    
-    INVALID = -1,
-    WELLCOME = 0,
-    LOGIN,
-    LOGIN_SUCCESS,
-    LOGIN_FAIL,
-    SHOW_INBOX,
-    GET_MAIL,
-    DELETE_MAIL,
-    COMPOSE,
-    QUIT   
+typedef enum {
+
+	INVALID = -1,
+	WELLCOME = 0,
+	LOGIN,
+	LOGIN_SUCCESS,
+	LOGIN_FAIL,
+	SHOW_INBOX,
+	GET_MAIL,
+	DELETE_MAIL,
+	COMPOSE,
+	QUIT
 
 } OPCODE;
 
 struct MAIL;
 
 typedef struct {
-    char    username[MAX_LEN];
-    char    password[MAX_LEN];
+	char username[MAX_LEN];
+	char password[MAX_LEN];
 } USER;
 
 #pragma pack(push,1)
 typedef struct {
-    char    from[MAX_LEN];
-    char    to[TOTAL_TO];
-    short   toLen;
-    char    subject[MAX_SUBJECT];
-    char    text[MAX_CONTENT];
+	char from[MAX_LEN];
+	char to[TOTAL_TO];
+	short toLen;
+	char subject[MAX_SUBJECT];
+	char text[MAX_CONTENT];
 } MAIL;
 #pragma pack(pop)
 
-
 typedef struct {
-    USER    list[MAX_USERS];
-    short   size;
+	USER list[MAX_USERS];
+	short size;
 } USERLIST;
-
-
-
 
 #define UnknownCommand()    printf("Unknown Command\n");    return -1;
 

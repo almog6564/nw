@@ -77,11 +77,6 @@ int initServer(int port){
 
 int main(int argc, char* argv[]){
 	
-	
-    for(int i=0;i<lst.size;i++){ 
-        printf("User: %s,\tPassword: %s\n",lst.list[i].username,lst.list[i].password);
-    }
-
 
     //check arguments
 	int status = 0;
