@@ -72,6 +72,39 @@ int initServer(int port){
 
 }
 
+int login (SOCKET s){
+int i=0;
+MSG logMsg, connected;
+USER usr;
+char username[MAX_LEN], password[MAX_LEN];
+int status = getMessage(s,&logMsg);
+if (status<0){
+    return -1; // ERROR
+}
+strcpy(username,logMsg.msg);
+strcpy(password,logMsg.msg+strlen(username)+1);
+
+for (i=0; i<lst.size; i++){
+    usr = lst.list[i];
+    if (strcmp(usr.username,username)==0 && strcmp(usr.password,password)==0){
+        break;
+    }
+    if (i==lst.size-1){
+        // Send Error MSG
+        return -1;
+    }
+}
+
+connected.opcode = LOGIN_SUCCESS;
+connected.length = 0;
+if(sendMessage(s,&connected)<0){
+    printf("sendMessage error\n");
+    return -1;
+}
+return 0;
+
+}
+
 
 
 
@@ -121,6 +154,10 @@ int main(int argc, char* argv[]){
 
 	// hello string message
 	status = sendMessage(s, &m);
+	if (login (s)<0){
+	    printf("error in login - wrong username/password");
+	    //Error in login
+}
     
 
 
