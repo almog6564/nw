@@ -5,6 +5,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -13,7 +14,7 @@
 
 USER user;
 
-// got size of wellcome but not message
+// got size of welcome but not message
 int clientProtocol(SOCKET);
 
 int getWelcome(SOCKET s) {
@@ -22,14 +23,13 @@ int getWelcome(SOCKET s) {
 
 	int status = getMessage(s, &welcome);
 	if (status < 0) {
-		printf("error getMessage\n");
 		return -1;
 	}
 	//check if welcome is correct
 
 	welcome.msg[welcome.length - 1] = '\0'; //sanity
-	if (welcome.opcode != WELLCOME) {
-		printf("Not a wellcome message\n");
+	if (welcome.opcode != WELCOME) {
+		printf("Welcome message is invalid\n");
 		return -1;
 	}
 	printf("%s\n", welcome.msg);
@@ -135,8 +135,7 @@ int userLogin(SOCKET s) {
 	loginMsg.opcode = LOGIN;
 	loginMsg.length = strlen(username) + strlen(password) + 2;
 	strncpy(loginMsg.msg, username, strlen(username) + 1);
-	strncpy(loginMsg.msg + strlen(username) + 1, password,
-			strlen(password) + 1);
+	strncpy(loginMsg.msg + strlen(username) + 1, password, strlen(password) + 1);
 
 	status = sendMessage(s, &loginMsg);
 	if (status < 0) {
@@ -152,12 +151,10 @@ int userLogin(SOCKET s) {
 		return -1;
 	}
 
-	if (loginStatus.opcode != LOGIN_SUCCESS) {
+	if (loginStatus.opcode == LOGIN_SUCCESS) {
 		printf("Connected to server\n");
 		return 0;
-	}
-
-	if (loginStatus.opcode != LOGIN_FAIL)
+	} else if (loginStatus.opcode == LOGIN_FAIL)
 		printf("Username or password incorrect\n");
 	else
 		printf("Error while getting login status\n");
@@ -233,6 +230,17 @@ int getMail(SOCKET s, char* mail_ID) {
 
 }
 
+int sendQuit(SOCKET s) {
+	MSG quit;
+	quit.opcode = QUIT;
+	quit.length = 0;
+	if (sendMessage(s, &quit) < 0) {
+		printf("Error while sending quit message\n");
+		return -1;
+	}
+	return 0;
+}
+
 int clientProtocol(SOCKET s) {
 	int status = 0;
 	char input[MAX_INPUT];
@@ -267,43 +275,47 @@ int clientProtocol(SOCKET s) {
 				printf("Error while getting mail\n");
 				return -1;
 			}
+		} else if (!strncmp(input, "QUIT", 4)) {
+			if (sendQuit(s) < 0) {
+				printf("Error while sending quit\n");
+				return -1;
+			}
+			return 0;
 		}
 	}
 }
 
 int main(int argc, char* argv[]) {
 
-	//check arguments
-
 	int status = 0;
-	/*
-	 switch(argc){
-	 case 1:
-	 status = initClient(HOST,PORT);
-	 //hostname = localhost
-	 //port = 6423
 
-	 case 2:
-	 status = initClient(argv[1],PORT);
-	 if(status < 0){
-	 //error
-	 return -1;
-	 }
-	 //only users_file;
-	 break;
+	char hostname[MAX_LEN];
+	int port = 0;
 
-	 case 3:
-	 //users_file + port
-	 break;
+	switch (argc) {
+	case 1:
+		strcpy(hostname, HOST);
+		port = DEFAULT_PORT;
 
-	 default:
-	 //wrong arguments
-	 break;
+		break;
 
+	case 3:
+		port = atoi(argv[2]);
+		if(!port)
+			goto INVALID;
 
-	 }
-	 */
-	status = initClient(HOST, PORT);
+	case 2:
+		strcpy(hostname, argv[1]);
+
+		break;
+
+	default:
+		INVALID:
+		printf("Invalid arguments.\nTry: mail_client [hostname [port]]");
+		return -1;
+
+	}
+	status = initClient(hostname, port);
 	if (status < 0) {
 		printf("initCLient error\n");
 	}
