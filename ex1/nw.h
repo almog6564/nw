@@ -16,7 +16,7 @@
 #define MAX_SUBJECT		100
 #define MAX_CONTENT		2000
 #define MAXMAILS		32000
-
+#define MAX_COMPOSE_TO	(MAX_LEN+5)*TOTAL_TO
 typedef int SOCKET;
 
 typedef struct {
@@ -42,6 +42,17 @@ typedef enum {
 
 struct MAIL;
 
+#pragma pack(push,1)
+typedef struct {
+	char from[MAX_LEN];
+	char to[TOTAL_TO][MAX_LEN];
+	short toLen;
+	char subject[MAX_SUBJECT];
+	char text[MAX_CONTENT];
+} MAIL;
+
+#pragma pack(pop)
+
 typedef struct {
 	char username[MAX_LEN];
 	char password[MAX_LEN];
@@ -50,15 +61,6 @@ typedef struct {
 	int inboxSize;
 } USER;
 
-#pragma pack(push,1)
-typedef struct {
-	char from[MAX_LEN];
-	char to[TOTAL_TO];
-	short toLen;
-	char subject[MAX_SUBJECT];
-	char text[MAX_CONTENT];
-} MAIL;
-#pragma pack(pop)
 
 typedef struct {
 	USER list[MAX_USERS];

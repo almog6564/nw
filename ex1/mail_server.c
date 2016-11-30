@@ -83,11 +83,12 @@ int receiveMail(SOCKET s){
 	strcpy(content,mailMsg.msg+strlen(username)+1+strlen(subject)+1);
 
 	// insert the parameters from the msg to a new mail
+	/*
 	mail.from = ;
 	mail.to = username;
 	mail.subject = subject;
 	mail.text = content;
-
+	*/
 	//search for the recipient of the mail and insert the new mail to its inbox
 	for (i=0; i<lst.size; i++){
 	    usr = lst.list[i];
@@ -114,7 +115,7 @@ int receiveMail(SOCKET s){
 	}
 	mailSent.opcode = COMPOSE;
 	mailSent.length = 0;
-	if(sendMessage(s,&cmailSent)<0){
+	if(sendMessage(s,&mailSent)<0){
 	    printf("sendMessage for mailSent error\n");
 	    return -1;
 	}

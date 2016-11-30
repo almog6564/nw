@@ -7,7 +7,7 @@ int getMessage(SOCKET s, MSG* message);
 
 int sendMessage(SOCKET s, MSG* message);
 
-
+void printMail(MAIL* m); 	//TODO DELETE
 
 
 

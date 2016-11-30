@@ -12,6 +12,20 @@
 #include "nw.h"
 #include "message.h"
 
+#define readVarFromString(string,string_size,output, prefix,prefix_size,error_msg)		\
+																				\
+									memset(string, 0, string_size);			\
+									fflush(stdout);								\
+									fgets(string, string_size, stdin);			\
+									string[strlen(string) - 1] = '\0';		\
+																				\
+									if (!strncmp(string, prefix, prefix_size)) {	\
+									strcpy(output, string + prefix_size);				\
+									} else {									\
+									printf(error_msg);	\
+									return -1;									\
+									}
+
 USER user;
 
 // got size of welcome but not message
@@ -98,36 +112,13 @@ int initClient(char* hostname, int port) {
 int userLogin(SOCKET s) {
 	int status = 0;
 	char input[MAX_LOGIN];
-	char username[50];
-	char password[50];
+	char username[MAX_LEN];
+	char password[MAX_LEN];
 
-	/*USERNAME*/
-	memset(input, 0, MAX_LOGIN);
-	fflush(stdout);
-	fgets(input, MAX_LOGIN, stdin);
-	input[strlen(input) - 1] = '\0';
+	/*USERNAME*/readVarFromString(input,MAX_LOGIN,username,"User: ",6,"Error while getting username\n")
 
-	if (!strncmp(input, "User: ", 6)) {
-		strcpy(username, input + 6);
-	} else {
-		printf("Error while getting username\n");
-		return -1;
-	}
-	/***/
+	/*PASSWORD*/readVarFromString(input,MAX_LOGIN,password,"Password: ",10,"Error while getting password\n")
 
-	/*PASSWORD*/
-	memset(input, 0, MAX_LOGIN);
-	fflush(stdout);
-	fgets(input, MAX_LOGIN, stdin);
-	input[strlen(input) - 1] = '\0';
-
-	if (!strncmp(input, "Password: ", 10)) {
-		strcpy(password, input + 10);
-	} else {
-		printf("Error while getting password\n");
-		return -1;
-	}
-	/***/
 	strcpy(user.username, username);
 	strcpy(user.password, password);
 
@@ -230,6 +221,78 @@ int getMail(SOCKET s, char* mail_ID) {
 
 }
 
+void getRecipients(char to[], MAIL* pmail) {
+	short toLen = 1;
+	char* cpy = to;
+
+	for (; *cpy != '\0'; cpy++) {
+		if (*cpy == ',') {
+			toLen++;
+			*cpy = 0;
+		}
+	}
+	pmail->toLen = toLen;
+
+	cpy = to;
+
+	for (int i = 0; i < toLen; i++) {
+		strcpy(pmail->to[i], cpy);
+		cpy += (strlen(cpy) + 1);
+	}
+
+}
+
+int composeMail(SOCKET s) {
+	int status = 0;
+	char to[MAX_COMPOSE_TO]; //enough for commas
+	char subject[MAX_SUBJECT];
+	char text[MAX_CONTENT];
+	MAIL mail;
+	strcpy(mail.from, user.username);
+
+	/*to*/
+	memset(to, 0, MAX_COMPOSE_TO);
+	fflush(stdout);
+	fgets(to, MAX_COMPOSE_TO, stdin);
+	to[strlen(to) - 1] = '\0';
+
+	do {
+		status = strncmp(to, "To: ", 4);
+		if (status < 0)
+			break;
+		if (*(to + 4) == 0) {
+			printf("Message must have recipients\n");
+			status = -1;
+			break;
+		}
+		getRecipients(to + 4, &mail);
+		break;
+	} while (0);
+	if (status < 0) {
+		printf("Error while getting recipients\n");
+		return -1;
+	}
+	/***/
+
+	//subject
+	readVarFromString(subject,MAX_SUBJECT,mail.subject,"Subject: ",9,"Error while getting subject\n")
+
+	//text
+	readVarFromString(text,MAX_CONTENT,mail.text,"Text: ",6,"Error while getting text\n")
+
+	MSG mailMSG;
+	mailMSG.length = sizeof(MAIL);
+	mailMSG.opcode = COMPOSE;
+	memcpy(mailMSG.msg, &mail,sizeof(MAIL));
+
+	/*
+	if(sendMessage(s,&mailMSG) < 0){
+
+	}
+	*/
+	return 0;
+}
+
 int sendQuit(SOCKET s) {
 	MSG quit;
 	quit.opcode = QUIT;
@@ -269,12 +332,19 @@ int clientProtocol(SOCKET s) {
 				return -1;
 			}
 		} else if (!strncmp(input, "GET_MAIL", 8)) {
-			if (strlen(input) < 10)
+			if (strlen(input) < 10) {
 				UnknownCommand()
+			}
 			if (getMail(s, input + 9)) {
 				printf("Error while getting mail\n");
 				return -1;
 			}
+		} else if (!strncmp(input, "COMPOSE", 8)) {
+			if (composeMail(s) < 0) {
+				printf("Error while composing mail\n");
+				return -1;
+			}
+
 		} else if (!strncmp(input, "QUIT", 4)) {
 			if (sendQuit(s) < 0) {
 				printf("Error while sending quit\n");
@@ -301,7 +371,7 @@ int main(int argc, char* argv[]) {
 
 	case 3:
 		port = atoi(argv[2]);
-		if(!port)
+		if (!port)
 			goto INVALID;
 
 	case 2:
@@ -310,8 +380,8 @@ int main(int argc, char* argv[]) {
 		break;
 
 	default:
-		INVALID:
-		printf("Invalid arguments.\nTry: mail_client [hostname [port]]");
+		INVALID: printf(
+				"Invalid arguments.\nTry: mail_client [hostname [port]]");
 		return -1;
 
 	}
