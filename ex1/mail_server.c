@@ -23,6 +23,9 @@ int createUsersList(char* path){
     }
     while (fgets(line, sizeof(line), fp) != NULL && i < MAX_USERS){
         sscanf(line, "%s %s", lst.list[i].username, lst.list[i].password); // TODO Error?
+        lst.list[i].inbox = (MAIL*)malloc(sizeof(MAIL));
+        lst.list[i].inboxSize = 1;
+        lst.list[i].inboxUsed = 0;
         i++;
         lst.size++;
     }
@@ -73,7 +76,7 @@ int initServer(int port){
 }
 
 int login (SOCKET s){
-int i=0;
+int i;
 MSG logMsg, connected;
 USER usr;
 char username[MAX_LEN], password[MAX_LEN];
@@ -102,6 +105,61 @@ if(sendMessage(s,&connected)<0){
     return -1;
 }
 return 0;
+
+}
+
+int receiveMail(SOCKET s){
+	int i;
+	MAIL mail;
+	MSG mailMsg, mailSent;
+	USER usr;
+	char username[MAX_LEN], subject[MAX_SUBJECT], content[MAX_CONTENT];
+	int status = getMessage(s,&mailMsg);
+	if (status<0){
+	    return -1; // ERROR
+	}
+	//extract the parameters of the mail from the msg
+	strcpy(username,mailMsg.msg);//TODO - check if multiple users
+	strcpy(subject,mailMsg.msg+strlen(username)+1);
+	strcpy(content,mailMsg.msg+strlen(username)+1+strlen(subject)+1);
+
+	// insert the parameters from the msg to a new mail
+	mail.from = ;
+	mail.to = username;
+	mail.subject = subject;
+	mail.text = content;
+
+	//search for the recipient of the mail and insert the new mail to its inbox
+	for (i=0; i<lst.size; i++){
+	    usr = lst.list[i];
+	    if (strcmp(usr.username,username)==0){
+	    	if (usr.inboxSize == 0){
+	    		usr.inbox[0] = mail;
+	    		usr.inboxUsed++;
+	    		break;
+	    	}
+	    	else {
+	    		if (usr.inboxSize>usr.inboxUsed) // if there is allocated space for the mail
+	    			usr.inbox[usr.inboxUsed++] = mail;
+	    		else { // if there is none allocated space, do doubling
+	    			usr.inboxSize *= 2;
+	    			usr.inbox = (MAIL*)realloc(usr.inbox, usr.inboxSize*sizeof(MAIL));
+	    		}
+	    		break;
+	    	}
+	    }
+	    else if (i==lst.size-1){
+	        // Send Error MSG
+	        return -1;
+	    }
+	}
+	mailSent.opcode = COMPOSE;
+	mailSent.length = 0;
+	if(sendMessage(s,&cmailSent)<0){
+	    printf("sendMessage for mailSent error\n");
+	    return -1;
+	}
+	return 0;
 
 }
 

@@ -45,6 +45,9 @@ struct MAIL;
 typedef struct {
 	char username[MAX_LEN];
 	char password[MAX_LEN];
+	MAIL* inbox;
+	int inboxUsed;
+	int inboxSize;
 } USER;
 
 #pragma pack(push,1)
