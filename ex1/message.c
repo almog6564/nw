@@ -23,12 +23,12 @@ int getBuffer(SOCKET s,void* buff,int len){
          //printf("got recv\n");
          switch(recvSize){
              case -1:
-             printf("error on recv\n");
+             //printf("Error\n");
              return -1;
 
              case 0:
-             printf("connection ended on recv\n");
-             return 0;
+             printf("Connection ended while receiving message\n");
+             return -1;
 
              default:
              tot        += recvSize;
@@ -45,13 +45,13 @@ int getBuffer(SOCKET s,void* buff,int len){
 int getMessage(SOCKET s, MSG* message){
 
     int chk = getBuffer(s,&message->opcode,LENGTH_SIZE);
-     if(chk <= 0)
+     if(chk < 0)
     {
         printf("error getBuffer\n");
         return chk;
     }
         chk = getBuffer(s,&message->length,LENGTH_SIZE);
-     if(chk <= 0)
+     if(chk < 0)
     {
         printf("error getBuffer\n");
         return chk;
@@ -92,11 +92,11 @@ int sendMessage(SOCKET s, MSG* message){
 
          switch(sent){
              case -1:
-             printf("send error");
+             //error
              return -1;
 
              case 0:
-             printf("send - connection eneded");
+             printf("Connection ended while sending message\n");
              return 0;
 
              default:
