@@ -97,6 +97,43 @@ int login(SOCKET s) {
 
 }
 
+int showInbox(SOCKET s, MSG* _showIn){
+	int i, j, k=0;
+	MSG showIn = *_showIn, opInval, inbox;
+	char username[MAX_LEN], c[1];
+
+	strcpy(username, showIn.msg);
+	for (j=0; j<MAX_USERS; j++) {
+		if (strcmp(lst.list[j].username, username) == 0)
+			break;
+		else if (j==MAX_USERS-1){
+			opInval.opcode = INVALID;
+			opInval.length = 0;
+			sendMessage(s,&opInval);
+		}
+	}
+
+	inbox.opcode = SHOW_INBOX;
+	for (i=0; i<lst.inboxSizes[j]; i++){
+		*c = i + '0';
+		if (memcmp(&lst.inbox[j][i],0,sizeof(MAIL))!=0){
+			strcpy(inbox.msg + k, c);
+			strcpy(inbox.msg + k + 1, lst.inbox[j][i].from);
+			strcpy(inbox.msg + k + strlen(lst.inbox[j][i].from) + 2, lst.inbox[j][i].subject);
+			k += strlen(lst.inbox[j][i].from) + strlen(lst.inbox[j][i].subject) + 3;
+		}
+	}
+
+	inbox.length = sizeof(MAIL);
+
+	if (sendMessage(s, &inbox) < 0) {
+		printf("Sending inbox to client failed\n");
+		return ERROR;
+	}
+
+	return OK;
+}
+
 int getMail(SOCKET s, MSG* _getMailMsg){
 	int j, mid;
 	MAIL mail;
@@ -105,7 +142,7 @@ int getMail(SOCKET s, MSG* _getMailMsg){
 
 	strcpy(username, getMail.msg);
 	strcpy(mail_id, getMail.msg + strlen(username) + 1);
-	mid = atoi(mail_id);
+	mid = atoi(mail_id)-1; // mail_id-s start counting from 1 but are saved in array from 0
 	for (j=0; j<MAX_USERS; j++) {
 		if (strcmp(lst.list[j].username, username) == 0)
 			break;
@@ -204,8 +241,10 @@ int serverProcess(SOCKET s) {
 			return QUIT;
 
 		case SHOW_INBOX:
-			printf("DEBUG - Got show inbox\n");
-			return 0;
+			if(showInbox(s, &get)< 0){
+				printf("DEBUG - Got show inbox\n");
+				return 0;
+			}
 
 		case GET_MAIL:
 			if(getMail(s, &get)< 0){
@@ -215,6 +254,12 @@ int serverProcess(SOCKET s) {
 
 		case COMPOSE:
 			if(receiveMail(s, &get)< 0){
+				printf("Error while getting compose message\n");
+				return -1;
+			}
+
+		case DELETE_MAIL:
+			if(deleteMail(s, &get)< 0){
 				printf("Error while getting compose message\n");
 				return -1;
 			}
