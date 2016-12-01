@@ -30,6 +30,33 @@ int createUsersList(char* path) {
 	return 0;
 }
 
+int deleteMail(SOCKET s,MSG* delmsg){
+	//search for user
+	int usr = 0;
+	for (; usr < lst.size; usr++) {
+		if(!strcmp(delmsg->msg, lst.list[usr].username)){
+			break;
+		}
+	}
+	int mailID = atoi(delmsg->msg+strlen(delmsg->msg)+1);
+	if(mailID < 0 || mailID >= MAXMAILS){
+		MSG inv;
+		inv.opcode = INVALID;
+		inv.length = 0;
+		if(sendMessage(s,&inv)<0){
+			printf("Error while sending invalid message in deleteMail\n");
+			return -1;
+		}
+	}
+
+	//Deleting:
+	//If mail doesnt exist it doesnt matter
+	memset(&lst.inbox[usr][mailID],0,sizeof(MAIL));
+
+	return 0;
+
+}
+
 int login(SOCKET s) {
 	int i;
 	MSG logMsg, connected;
@@ -75,15 +102,13 @@ int receiveMail(SOCKET s, MSG* _mailMsg) {
 	MAIL mail;
 	MSG mailSent, opInval;
 	MSG mailMsg = *_mailMsg;
-	char username[MAX_LEN];
 
 	memcpy(&mail, (MAIL*)mailMsg.msg, sizeof(MAIL));
 
 	//extract the parameters of the mail from the msg
 	for (; i < mail.toLen; i++) {
-		strcpy(username, mail.to[i]);
 		for (; j<MAX_USERS; j++) {
-			if (strcmp(lst.list[j].username, username) == 0)
+			if (!strcmp(lst.list[j].username, mail.to[i]))
 				break;
 			else if (j==MAX_USERS-1){
 				opInval.opcode = INVALID;
