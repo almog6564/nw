@@ -33,7 +33,6 @@ int getBuffer(SOCKET s, void* buff, int len) {
 	int leftToRead = len;
 
 	while (tot < leftToRead) {
-
 		recvSize = recv(s, (void*) ((long) buff + tot), leftToRead, 0);
 		//printf("got recv\n");
 		switch (recvSize) {
@@ -52,7 +51,6 @@ int getBuffer(SOCKET s, void* buff, int len) {
 
 		}
 	}
-
 	return tot;
 }
 
@@ -63,20 +61,24 @@ int getMessage(SOCKET s, MSG* message) {
 		printf("error getBuffer\n");
 		return chk;
 	}
+	message->opcode = ntohs(message->opcode);
+	printf("got OPCODE: %d\n",message->opcode);
 	chk = getBuffer(s, &message->length, LENGTH_SIZE);
 	if (chk < 0) {
 		printf("error getBuffer\n");
 		return chk;
 	}
-
-	message->opcode = ntohs(message->opcode);
 	message->length = ntohs(message->length); //so it would be BIG endian
+	printf("got length: %d\n",message->length);
+
+
+
 	//printf("message length = %d\n", message->length);
 
 	//TODO check if message is gonna be too long
 
 	chk = getBuffer(s, message->msg, message->length);
-
+	printf("got message: %s\n",message->msg);
 	return chk;
 
 }

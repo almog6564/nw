@@ -49,8 +49,14 @@ int login(SOCKET s) {
 			break;
 		}
 		if (i == lst.size - 1) {
-			// Send Error MSG
-			return -1;
+			MSG inv;
+			inv.opcode = LOGIN_FAIL;
+			inv.length = 0;
+			if(sendMessage(s,&inv)<0){
+				printf("Error sending invalid message\n");
+				return -1;
+			}
+			return 0;
 		}
 	}
 
@@ -64,19 +70,13 @@ int login(SOCKET s) {
 
 }
 
-int receiveMail(SOCKET s) {
+int receiveMail(SOCKET s, MSG* _mailMsg) {
 	int i = 0, j = 0;
 	MAIL mail;
-	MSG mailMsg, mailSent, opInval;
+	MSG mailSent, opInval;
+	MSG mailMsg = *_mailMsg;
 	char username[MAX_LEN];
-	int status = getMessage(s, &mailMsg);
-	if (status < 0) {
-		return -1; // ERROR
-	}
-	if(mailMsg.opcode!=COMPOSE){
-		printf ("invalid message \n");
-		return -1;
-	}
+
 	memcpy(&mail, (MAIL*)mailMsg.msg, sizeof(MAIL));
 
 	//extract the parameters of the mail from the msg
@@ -145,6 +145,12 @@ int serverProcess(SOCKET s) {
 		case GET_MAIL:
 			printf("DEBUG - Got get mail\n");
 			return 0;
+
+		case COMPOSE:
+			if(receiveMail(s, &get)< 0){
+				printf("Error while getting compose message\n");
+				return -1;
+			}
 		}
 	}
 

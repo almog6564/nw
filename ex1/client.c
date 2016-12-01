@@ -313,6 +313,8 @@ int composeMail(SOCKET s) {
 	//text
 	readVarFromString(text,MAX_CONTENT,mail.text,"Text: ",6,"Error while getting text\n")
 
+	printMail(&mail);
+
 	MSG mailMSG, ackMSG;
 	mailMSG.length = sizeof(MAIL);
 	mailMSG.opcode = COMPOSE;
@@ -322,7 +324,6 @@ int composeMail(SOCKET s) {
 		printf("Sending composed mail to server failed\n");
 		return ERROR;
 	}
-
 	if (getMessage(s, &ackMSG) < 0) {
 		printf("Getting ACK message after composing failed\n");
 		return ERROR;
@@ -331,7 +332,6 @@ int composeMail(SOCKET s) {
 		printf("One or more from the recipients don't exist, composing failed\n");
 		return OK;
 	}
-
 	return OK;
 }
 
