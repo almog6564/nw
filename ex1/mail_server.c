@@ -23,9 +23,7 @@ int createUsersList(char* path){
     }
     while (fgets(line, sizeof(line), fp) != NULL && i < MAX_USERS){
         sscanf(line, "%s %s", lst.list[i].username, lst.list[i].password); // TODO Error?
-        lst.list[i].inbox = (MAIL*)malloc(sizeof(MAIL));
-        lst.list[i].inboxSize = 1;
-        lst.list[i].inboxUsed = 0;
+        lst.list[i].inboxSize = 0;
         i++;
         lst.size++;
     }
@@ -93,20 +91,9 @@ int receiveMail(SOCKET s){
 	for (i=0; i<lst.size; i++){
 	    usr = lst.list[i];
 	    if (strcmp(usr.username,username)==0){
-	    	if (usr.inboxSize == 0){
-	    		usr.inbox[0] = mail;
-	    		usr.inboxUsed++;
-	    		break;
-	    	}
-	    	else {
-	    		if (usr.inboxSize>usr.inboxUsed) // if there is allocated space for the mail
-	    			usr.inbox[usr.inboxUsed++] = mail;
-	    		else { // if there is none allocated space, do doubling
-	    			usr.inboxSize *= 2;
-	    			usr.inbox = (MAIL*)realloc(usr.inbox, usr.inboxSize*sizeof(MAIL));
-	    		}
-	    		break;
-	    	}
+	    	usr.inbox[usr.inboxSize] = mail;
+	    	usr.inboxSize++;
+	    	break;
 	    }
 	    else if (i==lst.size-1){
 	        // Send Error MSG
