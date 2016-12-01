@@ -70,6 +70,46 @@ int login(SOCKET s) {
 
 }
 
+int getMail(SOCKET s, MSG* _getMailMsg){
+	int j, mid;
+	MAIL mail;
+	MSG getMail = *_getMailMsg, mailMSG, ackMSG, opInval;
+	char username[MAX_LEN], mail_id[MAX_LEN];
+
+	strcpy(username, getMail.msg);
+	strcpy(mail_id, getMail.msg + strlen(username) + 1);
+	mid = atoi(mail_id);
+	for (j=0; j<MAX_USERS; j++) {
+		if (strcmp(lst.list[j].username, username) == 0)
+			break;
+		else if (j==MAX_USERS-1){
+			opInval.opcode = INVALID;
+			opInval.length = 0;
+			sendMessage(s,&opInval);
+		}
+	}
+
+	memcpy(&mail, &lst.inbox[j][mid], sizeof(MAIL));
+
+	mailMSG.length = sizeof(MAIL);
+	mailMSG.opcode = GET_MAIL;
+	memcpy(mailMSG.msg, &mail, sizeof(MAIL));
+
+	if (sendMessage(s, &mailMSG) < 0) {
+		printf("Sending the mail to server failed\n");
+		return ERROR;
+	}
+	if (getMessage(s, &ackMSG) < 0) {
+		printf("Getting ACK message after getting mail failed\n");
+		return ERROR;
+	}
+	if (ackMSG.opcode != GET_MAIL){
+		printf("One or more from the recipients don't exist, composing failed\n");
+		return OK;
+	}
+	return OK;
+}
+
 int receiveMail(SOCKET s, MSG* _mailMsg) {
 	int i = 0, j = 0;
 	MAIL mail;
@@ -143,8 +183,10 @@ int serverProcess(SOCKET s) {
 			return 0;
 
 		case GET_MAIL:
-			printf("DEBUG - Got get mail\n");
-			return 0;
+			if(getMail(s, &get)< 0){
+				printf("DEBUG - Got get mail\n");
+				return 0;
+			}
 
 		case COMPOSE:
 			if(receiveMail(s, &get)< 0){

@@ -12,9 +12,6 @@
 #include "nw.h"
 #include "message.h"
 
-#define OK 	  (0)
-#define ERROR (-1)
-
 #define readVarFromString(string,string_size,output, prefix,prefix_size,error_msg)		\
 																				\
 									memset(string, 0, string_size);			\

@@ -17,6 +17,8 @@
 #define MAX_CONTENT		2000
 #define MAXMAILS		32000
 #define MAX_COMPOSE_TO	(MAX_LEN+5)*TOTAL_TO
+#define OK 	  (0)
+#define ERROR (-1)
 typedef int SOCKET;
 
 typedef struct {
