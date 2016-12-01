@@ -56,13 +56,13 @@ typedef struct {
 typedef struct {
 	char username[MAX_LEN];
 	char password[MAX_LEN];
-	int inboxSize;
 } USER;
 
 
 typedef struct {
 	USER list[MAX_USERS];
 	MAIL inbox[MAX_USERS][MAXMAILS];
+	int inboxSizes[MAX_USERS];
 	short size;
 
 } USERLIST;

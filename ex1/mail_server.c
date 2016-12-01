@@ -12,23 +12,22 @@
 
 USERLIST lst;
 
-int createUsersList(char* path){
-    memset(&lst,0,sizeof(lst));
-    char line[LINE_LEN];
-    int i = 0;    
-    FILE* fp = fopen(path, "r");
-    if(!fp){
-        printf("Error while opening users file");
-        return -1;
-    }
-    while (fgets(line, sizeof(line), fp) != NULL && i < MAX_USERS){
-        sscanf(line, "%s %s", lst.list[i].username, lst.list[i].password); // TODO Error?
-        lst.list[i].inboxSize = 0;
-        i++;
-        lst.size++;
-    }
-    fclose(fp);
-    return 0;
+int createUsersList(char* path) {
+	memset(&lst, 0, sizeof(lst));
+	char line[LINE_LEN];
+	int i = 0;
+	FILE* fp = fopen(path, "r");
+	if (!fp) {
+		printf("Error while opening users file");
+		return -1;
+	}
+	while (fgets(line, sizeof(line), fp) != NULL && i < MAX_USERS) {
+		sscanf(line, "%s %s", lst.list[i].username, lst.list[i].password); // TODO Error?
+		i++;
+		lst.size++;
+	}
+	fclose(fp);
+	return 0;
 }
 
 int login(SOCKET s) {
@@ -65,49 +64,45 @@ int login(SOCKET s) {
 
 }
 
-int receiveMail(SOCKET s){
-	int i;
+int receiveMail(SOCKET s) {
+	int i = 0, j = 0;
 	MAIL mail;
-	MSG mailMsg, mailSent;
-	USER usr;
-	char username[MAX_LEN], subject[MAX_SUBJECT], content[MAX_CONTENT];
-	int status = getMessage(s,&mailMsg);
-	if (status<0){
-	    return -1; // ERROR
+	MSG mailMsg, mailSent, opInval;
+	char username[MAX_LEN];
+	int status = getMessage(s, &mailMsg);
+	if (status < 0) {
+		return -1; // ERROR
 	}
-	//extract the parameters of the mail from the msg
-	strcpy(username,mailMsg.msg);//TODO - check if multiple users
-	strcpy(subject,mailMsg.msg+strlen(username)+1);
-	strcpy(content,mailMsg.msg+strlen(username)+1+strlen(subject)+1);
+	if(mailMsg.opcode!=COMPOSE){
+		printf ("invalid message \n");
+		return -1;
+	}
+	memcpy(&mail, (MAIL*)mailMsg.msg, sizeof(MAIL));
 
-	// insert the parameters from the msg to a new mail
-	/*
-	mail.from = ;
-	mail.to = username;
-	mail.subject = subject;
-	mail.text = content;
-	*/
-	//search for the recipient of the mail and insert the new mail to its inbox
-	for (i=0; i<lst.size; i++){
-	    usr = lst.list[i];
-	    if (strcmp(usr.username,username)==0){
-	    	//usr.inbox[usr.inboxSize] = mail;
-	    	usr.inboxSize++;
-	    	break;
-	    }
-	    else if (i==lst.size-1){
-	        // Send Error MSG
-	        return -1;
-	    }
+	//extract the parameters of the mail from the msg
+	for (; i < mail.toLen; i++) {
+		strcpy(username, mail.to[i]);
+		for (; j<MAX_USERS; j++) {
+			if (strcmp(lst.list[j].username, username) == 0)
+				break;
+			else if (j==MAX_USERS-1){
+				opInval.opcode = INVALID;
+				opInval.length = 0;
+				sendMessage(s,&opInval);
+			}
+		}
+		memcpy(&(lst.inbox[j][lst.inboxSizes[j]]), &mail, sizeof(MAIL));
+		lst.inboxSizes[j]++;
+		j = 0;
 	}
+
 	mailSent.opcode = COMPOSE;
 	mailSent.length = 0;
-	if(sendMessage(s,&mailSent)<0){
-	    printf("sendMessage for mailSent error\n");
-	    return -1;
+	if (sendMessage(s, &mailSent) < 0) {
+		printf("sendMessage for mailSent error\n");
+		return -1;
 	}
 	return 0;
-
 }
 
 int serverProcess(SOCKET s) {
@@ -130,7 +125,7 @@ int serverProcess(SOCKET s) {
 		return -1;
 		//Error in login
 	}
-	while (1) {	//Main commands loop. suppose to continue until getting QUIT opcode
+	while (1) { //Main commands loop. suppose to continue until getting QUIT opcode
 		MSG get;
 		if (getMessage(s, &get) < 0) {
 			printf("Error while getting message on server\n");
@@ -188,7 +183,7 @@ int initServer(int port) {
 
 	//maybe need to be in a loop:
 
-	while (1) {		//Main client connecting loop. after a quit waits for another accept
+	while (1) { //Main client connecting loop. after a quit waits for another accept
 		SOCKET s = accept(sock, (struct sockaddr *) (&client_addr), &sin_size);
 		if (s < 0) {
 			printf("Client accept error\n");
