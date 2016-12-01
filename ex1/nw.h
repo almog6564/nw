@@ -56,14 +56,15 @@ typedef struct {
 typedef struct {
 	char username[MAX_LEN];
 	char password[MAX_LEN];
-	MAIL inbox[32000];
 	int inboxSize;
 } USER;
 
 
 typedef struct {
 	USER list[MAX_USERS];
+	MAIL inbox[MAX_USERS][MAXMAILS];
 	short size;
+
 } USERLIST;
 
 #define UnknownCommand()    printf("Unknown Command\n");    return -1;

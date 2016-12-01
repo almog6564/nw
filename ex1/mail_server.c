@@ -91,7 +91,7 @@ int receiveMail(SOCKET s){
 	for (i=0; i<lst.size; i++){
 	    usr = lst.list[i];
 	    if (strcmp(usr.username,username)==0){
-	    	usr.inbox[usr.inboxSize] = mail;
+	    	//usr.inbox[usr.inboxSize] = mail;
 	    	usr.inboxSize++;
 	    	break;
 	    }
