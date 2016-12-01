@@ -12,6 +12,9 @@
 #include "nw.h"
 #include "message.h"
 
+#define OK 	  (0)
+#define ERROR (-1)
+
 #define readVarFromString(string,string_size,output, prefix,prefix_size,error_msg)		\
 																				\
 									memset(string, 0, string_size);			\
@@ -23,37 +26,51 @@
 									strcpy(output, string + prefix_size);				\
 									} else {									\
 									printf(error_msg);	\
-									return -1;									\
+									return ERROR;									\
 									}
 
 USER user;
 
-// got size of welcome but not message
+
 int clientProtocol(SOCKET);
 
+/*
+ * This function gets the welcome message from the server and prints it to the screen.
+ * param s	-	SOCKET of the connection
+ * return ERROR if sending error or connection ended,
+ 	 	  otherwise return OK
+ */
 int getWelcome(SOCKET s) {
 
 	MSG welcome;
 
 	int status = getMessage(s, &welcome);
 	if (status < 0) {
-		return -1;
+		return ERROR;
 	}
 	//check if welcome is correct
 
 	welcome.msg[welcome.length - 1] = '\0'; //sanity
 	if (welcome.opcode != WELCOME) {
 		printf("Welcome message is invalid\n");
-		return -1;
+		return ERROR;
 	}
 	printf("%s\n", welcome.msg);
-	return 0;
+	return OK;
 
 }
 
+/*
+ * This function runs the main flow of the client connection process and calls
+ * function clientProtocol for main flow of commands.
+ * param hostname	-	hostname to be used for connection
+ * param port		-	port to be used for connection
+ * return ERROR if sending error or connection ended,
+ 	 	  otherwise return OK
+ */
 int initClient(char* hostname, int port) {
 
-	int status = 0;
+	int status = OK;
 	struct addrinfo hints;
 	struct addrinfo *serverinfo;
 
@@ -65,73 +82,72 @@ int initClient(char* hostname, int port) {
 
 	sprintf(portString, "%d", port);
 
-	//printf("portString: %s\n",portString);
-
 	if (getaddrinfo(hostname, portString, &hints, &serverinfo) < 0) {
 		printf("getaddrinfo\nError: %s\n", strerror(errno));
-		return -1;
+		return ERROR;
 	}
-
-	//printf("got address\n");
 
 	SOCKET s = socket(serverinfo->ai_family, serverinfo->ai_socktype,
 			serverinfo->ai_protocol);
 
-	//printf("got socket\n");
-
 	if (s < 0) {
 		printf("socket\n");
-		return -1;
+		return ERROR;
 	}
 
-	//maybe TODO loop: ?
 	if (connect(s, serverinfo->ai_addr, serverinfo->ai_addrlen)) {
 		printf("connect error\n");
-		return -1;
+		return ERROR;
 	}
-
-	//printf("got connect\n");
 
 	freeaddrinfo(serverinfo);
 
-	//printf("got freeaddrinfo\n");
-
 	status = clientProtocol(s);
-
-	//status = startService(s);
 
 	if (close(s) < 0) {
 		printf("close error\n");
-		return -1;
+		return ERROR;
 	}
 
 	return status;
 
 }
 
+/*
+ * This function gets the login message from the user and connects
+ * param hostname	-	hostname to be used for connection
+ * param port		-	port to be used for connection
+ * return ERROR if sending error or connection ended,
+ 	 	  otherwise return OK
+ */
 int userLogin(SOCKET s) {
-	int status = 0;
+	int status = OK;
 	char input[MAX_LOGIN];
 	char username[MAX_LEN];
 	char password[MAX_LEN];
 
-	/*USERNAME*/readVarFromString(input,MAX_LOGIN,username,"User: ",6,"Error while getting username\n")
+	//username
+	readVarFromString(input,MAX_LOGIN,username,"User: ",6,"Error while getting username\n")
 
-	/*PASSWORD*/readVarFromString(input,MAX_LOGIN,password,"Password: ",10,"Error while getting password\n")
+	//password
+	readVarFromString(input,MAX_LOGIN,password,"Password: ",10,"Error while getting password\n")
 
 	strcpy(user.username, username);
 	strcpy(user.password, password);
 
+	int uslen = strlen(username) + 1, pslen = strlen(password) + 1;
+
 	MSG loginMsg;
 	loginMsg.opcode = LOGIN;
-	loginMsg.length = strlen(username) + strlen(password) + 2;
-	strncpy(loginMsg.msg, username, strlen(username) + 1);
-	strncpy(loginMsg.msg + strlen(username) + 1, password, strlen(password) + 1);
+	loginMsg.length = uslen + pslen;
+
+	strncpy(loginMsg.msg, username, uslen);
+	strncpy(loginMsg.msg + uslen, password, pslen);
 
 	status = sendMessage(s, &loginMsg);
 	if (status < 0) {
 		printf("Error while sending login message\n");
-		return -1;
+		return ERROR;
 	}
 
 	MSG loginStatus;
@@ -139,23 +155,23 @@ int userLogin(SOCKET s) {
 	status = getMessage(s, &loginStatus);
 	if (status < 0) {
 		printf("Error while getting login status\n");
-		return -1;
+		return ERROR;
 	}
 
 	if (loginStatus.opcode == LOGIN_SUCCESS) {
 		printf("Connected to server\n");
-		return 0;
+		return OK;
 	} else if (loginStatus.opcode == LOGIN_FAIL)
 		printf("Username or password incorrect\n");
 	else
 		printf("Error while getting login status\n");
 
-	return -1;
+	return ERROR;
 
 }
 
 int showInbox(SOCKET s) {
-	int status = 0;
+	int status = OK;
 	MSG cmnd;
 	cmnd.opcode = SHOW_INBOX;
 	cmnd.length = strlen(user.username) + 1;
@@ -164,60 +180,77 @@ int showInbox(SOCKET s) {
 	status = sendMessage(s, &cmnd);
 	if (status < 0) {
 		printf("Sending show Inbox command failed\n");
-		return -1;
+		return ERROR;
 	}
 	MSG inbox;
 	status = getMessage(s, &inbox);
 	if (status < 0) {
 		printf("Getting message command failed\n");
-		return -1;
+		return ERROR;
 	}
 	if (inbox.length > 0)
 		printf("%s", inbox.msg);
 	else {
 		printf("Error while showing inbox\n");
-		return -1;
+		return ERROR;
 	}
 
-	return 0;
+	return OK;
 }
 
 int getMail(SOCKET s, char* mail_ID) {
-	int status = 0;
+	int status = OK;
 	MSG cmnd;
 	cmnd.opcode = GET_MAIL;
 	cmnd.length = strlen(user.username) + strlen(mail_ID) + 2;
 	strcpy(cmnd.msg, user.username);
 	strcpy(cmnd.msg + strlen(user.username) + 1, mail_ID);
-	status = sendMessage(s, &cmnd);
 
-	if (status < 0) {
+	if (sendMessage(s, &cmnd) < 0) {
 		printf("Sending getMail command failed\n");
-		return -1;
+		return ERROR;
 	}
 	MSG mailMSG;
 	status = getMessage(s, &mailMSG);
 	if (status < 0) {
 		printf("Getting message command failed\n");
-		return -1;
+		return ERROR;
 	}
 	if (mailMSG.opcode == INVALID) {
 		printf("Invalid mail ID.\n");
-		return 0;
+		return OK;
 	}
-	/*
-	 MAIL* mail = (MAIL*) mailMSG.msg;
-	 printf("From: %s\n");
-	 printf("To: \n")
-	 for(int i=0;i<mail.toLen;i++){
-	 printf("%s",mail.to[i]);
-	 if(i != mail.toLen -1)
-	 printf(",");
-	 }
 
-	 printf("Subject: %s\nText: %s\n",mail.subject,mail.text);
-	 */
-	return 0;
+	MAIL* mail = (MAIL*) mailMSG.msg;
+	printMail(mail);
+	return OK;
+
+}
+
+int deleteMail(SOCKET s, char* mail_ID) {
+	int status = OK;
+	MSG cmnd;
+	cmnd.opcode = DELETE_MAIL;
+	cmnd.length = strlen(user.username) + strlen(mail_ID) + 2;
+	strcpy(cmnd.msg, user.username);
+	strcpy(cmnd.msg + strlen(user.username) + 1, mail_ID);
+
+	if (sendMessage(s, &cmnd) < 0) {
+		printf("Sending deleteMail command failed\n");
+		return ERROR;
+	}
+	MSG mailMSG;
+	status = getMessage(s, &mailMSG);
+	if (status < 0) {
+		printf("Getting message command failed\n");
+		return ERROR;
+	}
+
+	if (mailMSG.opcode == INVALID) {
+		printf("Invalid mail ID.\n");
+	}
+
+	return OK;
 
 }
 
@@ -243,7 +276,7 @@ void getRecipients(char to[], MAIL* pmail) {
 }
 
 int composeMail(SOCKET s) {
-	int status = 0;
+	int status = OK;
 	char to[MAX_COMPOSE_TO]; //enough for commas
 	char subject[MAX_SUBJECT];
 	char text[MAX_CONTENT];
@@ -270,7 +303,7 @@ int composeMail(SOCKET s) {
 	} while (0);
 	if (status < 0) {
 		printf("Error while getting recipients\n");
-		return -1;
+		return ERROR;
 	}
 	/***/
 
@@ -280,17 +313,26 @@ int composeMail(SOCKET s) {
 	//text
 	readVarFromString(text,MAX_CONTENT,mail.text,"Text: ",6,"Error while getting text\n")
 
-	MSG mailMSG;
+	MSG mailMSG, ackMSG;
 	mailMSG.length = sizeof(MAIL);
 	mailMSG.opcode = COMPOSE;
-	memcpy(mailMSG.msg, &mail,sizeof(MAIL));
+	memcpy(mailMSG.msg, &mail, sizeof(MAIL));
 
-	/*
-	if(sendMessage(s,&mailMSG) < 0){
-
+	if (sendMessage(s, &mailMSG) < 0) {
+		printf("Sending composed mail to server failed\n");
+		return ERROR;
 	}
-	*/
-	return 0;
+
+	if (getMessage(s, &ackMSG) < 0) {
+		printf("Getting ACK message after composing failed\n");
+		return ERROR;
+	}
+	if(ackMSG.opcode != COMPOSE){
+		printf("One or more from the recipients don't exist, composing failed\n");
+		return OK;
+	}
+
+	return OK;
 }
 
 int sendQuit(SOCKET s) {
@@ -299,26 +341,26 @@ int sendQuit(SOCKET s) {
 	quit.length = 0;
 	if (sendMessage(s, &quit) < 0) {
 		printf("Error while sending quit message\n");
-		return -1;
+		return ERROR;
 	}
-	return 0;
+	return OK;
 }
 
 int clientProtocol(SOCKET s) {
-	int status = 0;
+	int status = OK;
 	char input[MAX_INPUT];
 
 	status = getWelcome(s);
 
 	if (status < 0) {
 		printf("getWelcome error\n");
-		return -1;
+		return ERROR;
 	}
 
 	status = userLogin(s);
 	if (status < 0) {
 		printf("Error while login\n");
-		return -1;
+		return ERROR;
 	}
 
 	while (1) {
@@ -329,7 +371,7 @@ int clientProtocol(SOCKET s) {
 		if (!strcmp(input, "SHOW_INBOX")) {
 			if (showInbox(s) < 0) {
 				printf("Error while getting inbox\n");
-				return -1;
+				return ERROR;
 			}
 		} else if (!strncmp(input, "GET_MAIL", 8)) {
 			if (strlen(input) < 10) {
@@ -337,27 +379,27 @@ int clientProtocol(SOCKET s) {
 			}
 			if (getMail(s, input + 9)) {
 				printf("Error while getting mail\n");
-				return -1;
+				return ERROR;
 			}
 		} else if (!strncmp(input, "COMPOSE", 8)) {
 			if (composeMail(s) < 0) {
 				printf("Error while composing mail\n");
-				return -1;
+				return ERROR;
 			}
 
 		} else if (!strncmp(input, "QUIT", 4)) {
 			if (sendQuit(s) < 0) {
 				printf("Error while sending quit\n");
-				return -1;
+				return ERROR;
 			}
-			return 0;
+			return OK;
 		}
 	}
 }
 
 int main(int argc, char* argv[]) {
 
-	int status = 0;
+	int status = OK;
 
 	char hostname[MAX_LEN];
 	int port = 0;
@@ -382,7 +424,7 @@ int main(int argc, char* argv[]) {
 	default:
 		INVALID: printf(
 				"Invalid arguments.\nTry: mail_client [hostname [port]]");
-		return -1;
+		return ERROR;
 
 	}
 	status = initClient(hostname, port);
