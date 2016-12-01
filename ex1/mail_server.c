@@ -8,9 +8,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include "message.h"
 
 USERLIST lst;
+ACTIVEUSER gUser;
 
 int createUsersList(char* path) {
 	memset(&lst, 0, sizeof(lst));
@@ -28,33 +30,6 @@ int createUsersList(char* path) {
 	}
 	fclose(fp);
 	return 0;
-}
-
-int deleteMail(SOCKET s,MSG* delmsg){
-	//search for user
-	int usr = 0;
-	for (; usr < lst.size; usr++) {
-		if(!strcmp(delmsg->msg, lst.list[usr].username)){
-			break;
-		}
-	}
-	int mailID = atoi(delmsg->msg+strlen(delmsg->msg)+1);
-	if(mailID < 0 || mailID >= MAXMAILS){
-		MSG inv;
-		inv.opcode = INVALID;
-		inv.length = 0;
-		if(sendMessage(s,&inv)<0){
-			printf("Error while sending invalid message in deleteMail\n");
-			return -1;
-		}
-	}
-
-	//Deleting:
-	//If mail doesnt exist it doesnt matter
-	memset(&lst.inbox[usr][mailID],0,sizeof(MAIL));
-
-	return 0;
-
 }
 
 int login(SOCKET s) {
@@ -79,13 +54,16 @@ int login(SOCKET s) {
 			MSG inv;
 			inv.opcode = LOGIN_FAIL;
 			inv.length = 0;
-			if(sendMessage(s,&inv)<0){
+			if (sendMessage(s, &inv) < 0) {
 				printf("Error sending invalid message\n");
 				return -1;
 			}
 			return 0;
 		}
 	}
+
+	gUser.userID = i;
+	memcpy(&gUser.user, &lst.list[i], sizeof(USER));
 
 	connected.opcode = LOGIN_SUCCESS;
 	connected.length = 0;
@@ -97,79 +75,85 @@ int login(SOCKET s) {
 
 }
 
-int showInbox(SOCKET s, MSG* _showIn){
-	int i, j, k=0;
-	MSG showIn = *_showIn, opInval, inbox;
-	char username[MAX_LEN], c[1];
-
-	strcpy(username, showIn.msg);
-	for (j=0; j<MAX_USERS; j++) {
-		if (strcmp(lst.list[j].username, username) == 0)
-			break;
-		else if (j==MAX_USERS-1){
-			opInval.opcode = INVALID;
-			opInval.length = 0;
-			sendMessage(s,&opInval);
+int isValidMail(MAIL* mail) {
+	if (strlen(mail->from) && strlen(mail->subject) && strlen(mail->text)
+			&& mail->toLen > 0) {
+		for (int i = 0; i < mail->toLen; i++) {
+			if (!strlen(mail->to[i])) {
+				return 0;
+			}
 		}
+		return 1;
 	}
+	return 0;
 
-	inbox.opcode = SHOW_INBOX;
-	for (i=0; i<lst.inboxSizes[j]; i++){
-		*c = i + '0';
-		if (memcmp(&lst.inbox[j][i],0,sizeof(MAIL))!=0){
-			strcpy(inbox.msg + k, c);
-			strcpy(inbox.msg + k + 1, lst.inbox[j][i].from);
-			strcpy(inbox.msg + k + strlen(lst.inbox[j][i].from) + 2, lst.inbox[j][i].subject);
-			k += strlen(lst.inbox[j][i].from) + strlen(lst.inbox[j][i].subject) + 3;
+}
+
+int showInbox(SOCKET s) {
+	int mailid;
+
+	if (!lst.inboxSizes[gUser.userID]) {
+		MSG inbox;
+		inbox.opcode = SHOW_INBOX;
+		inbox.length = 0;
+		if (sendMessage(s, &inbox) < 0) {
+			printf("Sending inbox to client failed\n");
+			return ERROR;
 		}
+	} else {
+		int mailCntr = 0;
+		for (mailid = 0; mailid < lst.inboxSizes[gUser.userID]; mailid++) {
+			if (lst.isMail[gUser.userID][mailid])
+				mailCntr++;
+		}
+		MSG num;
+		num.opcode = COMPOSE;
+		sprintf(num.msg, "%d", mailCntr);
+		num.length = strlen(num.msg) + 1;
+		if (sendMessage(s, &num) < 0) {
+			printf("Sending inbox to client failed\n");
+			return ERROR;
+		}
+
+		for (mailid = 0; mailid <= lst.inboxSizes[gUser.userID]; mailid++) {
+			if (lst.isMail[gUser.userID][mailid]) {
+				MSG mailMSG;
+				mailMSG.opcode = COMPOSE;
+				sprintf(mailMSG.msg, "%d %s \"%s\"\n", mailid + 1,
+						lst.inbox[gUser.userID][mailid].from,
+						lst.inbox[gUser.userID][mailid].subject);
+				mailMSG.length = strlen(mailMSG.msg) + 1;
+
+				if (sendMessage(s, &mailMSG) < 0) {
+					printf("Sending inbox to client failed\n");
+					return ERROR;
+				}
+			}
+		}
+
 	}
-
-	inbox.length = sizeof(MAIL);
-
-	if (sendMessage(s, &inbox) < 0) {
-		printf("Sending inbox to client failed\n");
-		return ERROR;
-	}
-
 	return OK;
 }
 
-int getMail(SOCKET s, MSG* _getMailMsg){
-	int j, mid;
-	MAIL mail;
-	MSG getMail = *_getMailMsg, mailMSG, ackMSG, opInval;
-	char username[MAX_LEN], mail_id[MAX_LEN];
+int getMail(SOCKET s, MSG* _getMailMsg) {
+	int mid;
+	MSG getMail = *_getMailMsg, mailMSG;
+	char mail_id[MAX_LEN];
 
-	strcpy(username, getMail.msg);
-	strcpy(mail_id, getMail.msg + strlen(username) + 1);
-	mid = atoi(mail_id)-1; // mail_id-s start counting from 1 but are saved in array from 0
-	for (j=0; j<MAX_USERS; j++) {
-		if (strcmp(lst.list[j].username, username) == 0)
-			break;
-		else if (j==MAX_USERS-1){
-			opInval.opcode = INVALID;
-			opInval.length = 0;
-			sendMessage(s,&opInval);
-		}
+	strcpy(mail_id, getMail.msg);
+	mid = atoi(mail_id) - 1; // mail_id-s start counting from 1 but are saved in array from 0
+
+	if (mid < 0 || !lst.isMail[gUser.userID][mid]) {
+		mailMSG.length = 0;
+		mailMSG.opcode = INVALID;
+	} else {
+		mailMSG.length = sizeof(MAIL);
+		mailMSG.opcode = GET_MAIL;
+		memcpy(mailMSG.msg, (char*)(&lst.inbox[gUser.userID][mid]), sizeof(MAIL));
 	}
-
-	memcpy(&mail, &lst.inbox[j][mid], sizeof(MAIL));
-
-	mailMSG.length = sizeof(MAIL);
-	mailMSG.opcode = GET_MAIL;
-	memcpy(mailMSG.msg, &mail, sizeof(MAIL));
-
 	if (sendMessage(s, &mailMSG) < 0) {
 		printf("Sending the mail to server failed\n");
 		return ERROR;
-	}
-	if (getMessage(s, &ackMSG) < 0) {
-		printf("Getting ACK message after getting mail failed\n");
-		return ERROR;
-	}
-	if (ackMSG.opcode != GET_MAIL){
-		printf("One or more from the recipients don't exist, composing failed\n");
-		return OK;
 	}
 	return OK;
 }
@@ -180,22 +164,25 @@ int receiveMail(SOCKET s, MSG* _mailMsg) {
 	MSG mailSent, opInval;
 	MSG mailMsg = *_mailMsg;
 
-	memcpy(&mail, (MAIL*)mailMsg.msg, sizeof(MAIL));
-
+	memcpy(&mail, (MAIL*) mailMsg.msg, sizeof(MAIL));
 	//extract the parameters of the mail from the msg
 	for (; i < mail.toLen; i++) {
-		for (; j<MAX_USERS; j++) {
-			if (!strcmp(lst.list[j].username, mail.to[i]))
+		for (; j < lst.size; j++) {
+			if (!strcmp(lst.list[j].username, mail.to[i])) {
+				memcpy(&(lst.inbox[j][lst.inboxSizes[j]]), &mail, sizeof(MAIL));
+				lst.isMail[j][lst.inboxSizes[j]] = 1; //mail exists
+				lst.inboxSizes[j]++;
 				break;
-			else if (j==MAX_USERS-1){
+
+			} else if (j == lst.size - 1) {
 				opInval.opcode = INVALID;
 				opInval.length = 0;
-				sendMessage(s,&opInval);
+				sendMessage(s, &opInval);
+				break;
 			}
 		}
-		memcpy(&(lst.inbox[j][lst.inboxSizes[j]]), &mail, sizeof(MAIL));
-		lst.inboxSizes[j]++;
 		j = 0;
+
 	}
 
 	mailSent.opcode = COMPOSE;
@@ -205,6 +192,35 @@ int receiveMail(SOCKET s, MSG* _mailMsg) {
 		return -1;
 	}
 	return 0;
+}
+
+int deleteMail(SOCKET s, MSG* delmsg) {
+	int mailID = atoi(delmsg->msg) - 1;
+	if (mailID < 0 || mailID > MAXMAILS) {
+		MSG inv;
+		inv.opcode = INVALID;
+		inv.length = 0;
+		if (sendMessage(s, &inv) < 0) {
+			printf("Error while sending invalid message in deleteMail\n");
+			return -1;
+		}
+	}
+
+	//Deleting:
+	//If mail doesnt exist it doesnt matter
+	//memset(&lst.inbox[gUser.userID][mailID], 0, sizeof(MAIL))
+	lst.isMail[gUser.userID][mailID] = 0;
+	if (mailID == lst.inboxSizes[gUser.userID])
+		lst.inboxSizes[gUser.userID]--;
+	MSG ok;
+	ok.opcode = DELETE_MAIL;
+	ok.length = 0;
+	if (sendMessage(s, &ok) < 0) {
+		printf("Error while sending ack message in deleteMail\n");
+		return -1;
+	}
+	return 0;
+
 }
 
 int serverProcess(SOCKET s) {
@@ -223,9 +239,7 @@ int serverProcess(SOCKET s) {
 	}
 
 	if (login(s) < 0) {
-		printf("error in login - wrong username/password\n");
-		return -1;
-		//Error in login
+		return LOGIN_FAIL;
 	}
 	while (1) { //Main commands loop. suppose to continue until getting QUIT opcode
 		MSG get;
@@ -236,33 +250,38 @@ int serverProcess(SOCKET s) {
 		switch (get.opcode) {
 
 		case QUIT:
+			memset(&gUser, 0, sizeof(ACTIVEUSER));
 			close(s);
-			printf("DEBUG - Got quit message\n");
+			printf("DEBUG - Got quit message\n"); //TODO DELETE
 			return QUIT;
 
 		case SHOW_INBOX:
-			if(showInbox(s, &get)< 0){
-				printf("DEBUG - Got show inbox\n");
-				return 0;
+			if (showInbox(s) < 0) {
+				printf("Error while showing inbox\n");
+				return -1;
 			}
+			break;
 
 		case GET_MAIL:
-			if(getMail(s, &get)< 0){
-				printf("DEBUG - Got get mail\n");
-				return 0;
+			if (getMail(s, &get) < 0) {
+				printf("Error while getting mail\n");
+				return -1;
 			}
+			break;
 
 		case COMPOSE:
-			if(receiveMail(s, &get)< 0){
-				printf("Error while getting compose message\n");
+			if (receiveMail(s, &get) < 0) {
+				printf("Error while getting composed message\n");
 				return -1;
 			}
+			break;
 
 		case DELETE_MAIL:
-			if(deleteMail(s, &get)< 0){
-				printf("Error while getting compose message\n");
+			if (deleteMail(s, &get) < 0) {
+				printf("Error while deleting mail\n");
 				return -1;
 			}
+			break;
 		}
 	}
 
@@ -311,7 +330,7 @@ int initServer(int port) {
 		int status = serverProcess(s);
 		if (status < 0) {
 			return -1;
-		} else if (status == QUIT) {
+		} else if (status == QUIT || status == LOGIN_FAIL) {
 			continue;
 		} else
 			break;
@@ -323,6 +342,9 @@ int initServer(int port) {
 }
 
 int main(int argc, char* argv[]) {
+
+	memset(&lst, 0, sizeof(lst));
+	memset(&gUser, 0, sizeof(ACTIVEUSER));
 
 	//check arguments
 	int status = 0;

@@ -8,25 +8,24 @@
 #include <string.h>
 #include "nw.h"
 
-//TODO DELETE ::
 void printMail(MAIL* m) {
 	if (!m)
 		return;
 
-	printf("Printing mail:\n");
-	printf("From: |%s|\n", m->from);
+	printf("From: %s\n", m->from);
 	printf("To: ");
-	for(int i=0;i<m->toLen;i++){
-		printf("|%s| , ",m->to[i]);
+	for (int i = 0; i < m->toLen; i++) {
+		printf("%s", m->to[i]);
+		if (i < m->toLen - 1) {
+			printf(",");
+		}
 	}
 	printf("\n");
-	printf("Subject: |%s|\n",m->subject);
-	printf("Text: |%s|\n",m->text);
+	printf("Subject: %s\n", m->subject);
+	printf("Text: %s\n", m->text);
 }
 
 int getBuffer(SOCKET s, void* buff, int len) {
-
-	//printf("got getBuffer\n");
 
 	int recvSize;
 	int tot = 0;
@@ -34,10 +33,8 @@ int getBuffer(SOCKET s, void* buff, int len) {
 
 	while (tot < leftToRead) {
 		recvSize = recv(s, (void*) ((long) buff + tot), leftToRead, 0);
-		//printf("got recv\n");
 		switch (recvSize) {
 		case -1:
-			//printf("Error\n");
 			return -1;
 
 		case 0:
@@ -56,31 +53,20 @@ int getBuffer(SOCKET s, void* buff, int len) {
 
 int getMessage(SOCKET s, MSG* message) {
 
-	int chk = getBuffer(s, &message->opcode, LENGTH_SIZE);
-	if (chk < 0) {
-		printf("error getBuffer\n");
-		return chk;
-	}
+	if (getBuffer(s, &message->opcode, LENGTH_SIZE) < 0)
+		return ERROR;
+
 	message->opcode = ntohs(message->opcode);
-	printf("got OPCODE: %d\n",message->opcode);
-	chk = getBuffer(s, &message->length, LENGTH_SIZE);
-	if (chk < 0) {
-		printf("error getBuffer\n");
-		return chk;
-	}
+	if (getBuffer(s, &message->length, LENGTH_SIZE) < 0)
+		return ERROR;
+
 	message->length = ntohs(message->length); //so it would be BIG endian
-	printf("got length: %d\n",message->length);
 
+	if (message->length > MAXSIZE) {
+		printf("Message got is too long, failing..\n");
+	}
 
-
-	//printf("message length = %d\n", message->length);
-
-	//TODO check if message is gonna be too long
-
-	chk = getBuffer(s, message->msg, message->length);
-	printf("got message: %s\n",message->msg);
-	return chk;
-
+	return getBuffer(s, message->msg, message->length);
 }
 
 int sendMessage(SOCKET s, MSG* message) {

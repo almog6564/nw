@@ -171,8 +171,7 @@ int showInbox(SOCKET s) {
 	int status = OK;
 	MSG cmnd;
 	cmnd.opcode = SHOW_INBOX;
-	cmnd.length = strlen(user.username) + 1;
-	strcpy(cmnd.msg, user.username);
+	cmnd.length = 0;
 
 	status = sendMessage(s, &cmnd);
 	if (status < 0) {
@@ -185,11 +184,20 @@ int showInbox(SOCKET s) {
 		printf("Getting message command failed\n");
 		return ERROR;
 	}
-	if (inbox.length > 0)
-		printf("%s", inbox.msg);
-	else {
-		printf("Error while showing inbox\n");
-		return ERROR;
+	if(inbox.opcode!= COMPOSE){
+		printf("Invalid message\n");
+		return -1;
+	}
+	if(inbox.length > 0){
+		int numOfMails = atoi(inbox.msg);
+		for(int mail = 0; mail < numOfMails; mail++){
+			MSG cur;
+			if(getMessage(s,&cur) < 0){
+				printf("Error while getting inbox message\n");
+				return -1;
+			}
+			printf("%s",cur.msg);
+		}
 	}
 
 	return OK;
@@ -199,9 +207,8 @@ int getMail(SOCKET s, char* mail_ID) {
 	int status = OK;
 	MSG cmnd;
 	cmnd.opcode = GET_MAIL;
-	cmnd.length = strlen(user.username) + strlen(mail_ID) + 2;
-	strcpy(cmnd.msg, user.username);
-	strcpy(cmnd.msg + strlen(user.username) + 1, mail_ID);
+	cmnd.length = strlen(mail_ID) + 1;
+	strcpy(cmnd.msg, mail_ID);
 
 	if (sendMessage(s, &cmnd) < 0) {
 		printf("Sending getMail command failed\n");
@@ -228,9 +235,8 @@ int deleteMail(SOCKET s, char* mail_ID) {
 	int status = OK;
 	MSG cmnd;
 	cmnd.opcode = DELETE_MAIL;
-	cmnd.length = strlen(user.username) + strlen(mail_ID) + 2;
-	strcpy(cmnd.msg, user.username);
-	strcpy(cmnd.msg + strlen(user.username) + 1, mail_ID);
+	cmnd.length = strlen(mail_ID) + 1;
+	strcpy(cmnd.msg, mail_ID);
 
 	if (sendMessage(s, &cmnd) < 0) {
 		printf("Sending deleteMail command failed\n");
@@ -310,8 +316,6 @@ int composeMail(SOCKET s) {
 	//text
 	readVarFromString(text,MAX_CONTENT,mail.text,"Text: ",6,"Error while getting text\n")
 
-	printMail(&mail);
-
 	MSG mailMSG, ackMSG;
 	mailMSG.length = sizeof(MAIL);
 	mailMSG.opcode = COMPOSE;
@@ -378,6 +382,14 @@ int clientProtocol(SOCKET s) {
 				printf("Error while getting mail\n");
 				return ERROR;
 			}
+		} else if (!strncmp(input, "DELETE_MAIL", 11)) {
+			if (strlen(input) < 13) {
+				UnknownCommand()
+			}
+			if (deleteMail(s, input + 12) < 0) {
+				printf("Error while deleting mail\n");
+				return ERROR;
+			}
 		} else if (!strncmp(input, "COMPOSE", 8)) {
 			if (composeMail(s) < 0) {
 				printf("Error while composing mail\n");
@@ -390,6 +402,9 @@ int clientProtocol(SOCKET s) {
 				return ERROR;
 			}
 			return OK;
+		}
+		else{
+			UnknownCommand()
 		}
 	}
 }

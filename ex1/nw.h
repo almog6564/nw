@@ -65,9 +65,14 @@ typedef struct {
 	USER list[MAX_USERS];
 	MAIL inbox[MAX_USERS][MAXMAILS];
 	int inboxSizes[MAX_USERS];
-	short size;
-
+	short size;	//effectively shows the biggest index mail that exists + 1
+	int isMail[MAX_USERS][MAXMAILS];
 } USERLIST;
+
+typedef struct {
+	USER user;
+	short userID;
+} ACTIVEUSER;
 
 #define UnknownCommand()    printf("Unknown Command\n");    return -1;
 
