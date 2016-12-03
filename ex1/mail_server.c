@@ -21,7 +21,7 @@ int createUsersList(char* path) {
 	FILE* fp = fopen(path, "r");
 	if (!fp) {
 		printf("Error while opening users file");
-		return -1;
+		return ERROR;
 	}
 	while (fgets(line, sizeof(line), fp) != NULL && i < MAX_USERS) {
 		sscanf(line, "%s %s", lst.list[i].username, lst.list[i].password); // TODO Error?
@@ -29,7 +29,7 @@ int createUsersList(char* path) {
 		lst.size++;
 	}
 	fclose(fp);
-	return 0;
+	return OK;
 }
 
 int login(SOCKET s) {
@@ -39,8 +39,10 @@ int login(SOCKET s) {
 	char username[MAX_LEN], password[MAX_LEN];
 	int status = getMessage(s, &logMsg);
 	if (status < 0) {
-		return -1; // ERROR
-	}
+		return ERROR; // ERROR
+	} else if (logMsg.opcode == QUIT)
+		return QUIT;
+
 	strcpy(username, logMsg.msg);
 	strcpy(password, logMsg.msg + strlen(username) + 1);
 
@@ -56,9 +58,9 @@ int login(SOCKET s) {
 			inv.length = 0;
 			if (sendMessage(s, &inv) < 0) {
 				printf("Error sending invalid message\n");
-				return -1;
+				return ERROR;
 			}
-			return 0;
+			return OK;
 		}
 	}
 
@@ -69,9 +71,9 @@ int login(SOCKET s) {
 	connected.length = 0;
 	if (sendMessage(s, &connected) < 0) {
 		printf("sendMessage error\n");
-		return -1;
+		return ERROR;
 	}
-	return 0;
+	return OK;
 
 }
 
@@ -80,12 +82,12 @@ int isValidMail(MAIL* mail) {
 			&& mail->toLen > 0) {
 		for (int i = 0; i < mail->toLen; i++) {
 			if (!strlen(mail->to[i])) {
-				return 0;
+				return OK;
 			}
 		}
 		return 1;
 	}
-	return 0;
+	return OK;
 
 }
 
@@ -149,7 +151,8 @@ int getMail(SOCKET s, MSG* _getMailMsg) {
 	} else {
 		mailMSG.length = sizeof(MAIL);
 		mailMSG.opcode = GET_MAIL;
-		memcpy(mailMSG.msg, (char*)(&lst.inbox[gUser.userID][mid]), sizeof(MAIL));
+		memcpy(mailMSG.msg, (char*) (&lst.inbox[gUser.userID][mid]),
+				sizeof(MAIL));
 	}
 	if (sendMessage(s, &mailMSG) < 0) {
 		printf("Sending the mail to server failed\n");
@@ -189,9 +192,9 @@ int receiveMail(SOCKET s, MSG* _mailMsg) {
 	mailSent.length = 0;
 	if (sendMessage(s, &mailSent) < 0) {
 		printf("sendMessage for mailSent error\n");
-		return -1;
+		return ERROR;
 	}
-	return 0;
+	return OK;
 }
 
 int deleteMail(SOCKET s, MSG* delmsg) {
@@ -202,7 +205,7 @@ int deleteMail(SOCKET s, MSG* delmsg) {
 		inv.length = 0;
 		if (sendMessage(s, &inv) < 0) {
 			printf("Error while sending invalid message in deleteMail\n");
-			return -1;
+			return ERROR;
 		}
 	}
 
@@ -217,9 +220,9 @@ int deleteMail(SOCKET s, MSG* delmsg) {
 	ok.length = 0;
 	if (sendMessage(s, &ok) < 0) {
 		printf("Error while sending ack message in deleteMail\n");
-		return -1;
+		return ERROR;
 	}
-	return 0;
+	return OK;
 
 }
 
@@ -235,57 +238,61 @@ int serverProcess(SOCKET s) {
 	// hello string message
 	if (sendMessage(s, &m) < 0) {
 		printf("Error while sending welcome message\n");
-		return -1;
+		return ERROR;
+	}
+	int status = login(s);
+	if (status < 0) {
+		return LOGIN_FAIL;
+	} else if (status == QUIT) {
+		memset(&gUser, 0, sizeof(ACTIVEUSER));
+		close(s);
+		return QUIT;
 	}
 
-	if (login(s) < 0) {
-		return LOGIN_FAIL;
-	}
 	while (1) { //Main commands loop. suppose to continue until getting QUIT opcode
 		MSG get;
 		if (getMessage(s, &get) < 0) {
 			printf("Error while getting message on server\n");
-			return -1;
+			return ERROR;
 		}
 		switch (get.opcode) {
 
 		case QUIT:
 			memset(&gUser, 0, sizeof(ACTIVEUSER));
 			close(s);
-			printf("DEBUG - Got quit message\n"); //TODO DELETE
 			return QUIT;
 
 		case SHOW_INBOX:
 			if (showInbox(s) < 0) {
 				printf("Error while showing inbox\n");
-				return -1;
+				return ERROR;
 			}
 			break;
 
 		case GET_MAIL:
 			if (getMail(s, &get) < 0) {
 				printf("Error while getting mail\n");
-				return -1;
+				return ERROR;
 			}
 			break;
 
 		case COMPOSE:
 			if (receiveMail(s, &get) < 0) {
 				printf("Error while getting composed message\n");
-				return -1;
+				return ERROR;
 			}
 			break;
 
 		case DELETE_MAIL:
 			if (deleteMail(s, &get) < 0) {
 				printf("Error while deleting mail\n");
-				return -1;
+				return ERROR;
 			}
 			break;
 		}
 	}
 
-	return 0;
+	return OK;
 }
 
 int initServer(int port) {
@@ -294,7 +301,7 @@ int initServer(int port) {
 
 	if (sock < 0) {
 		printf("socket error\n");
-		return -1;
+		return ERROR;
 	}
 
 	struct sockaddr_in my_addr, client_addr;
@@ -308,12 +315,12 @@ int initServer(int port) {
 
 	if (bind(sock, (struct sockaddr *) (&my_addr), sizeof(my_addr)) < 0) {
 		printf("bind error\n");
-		return -1;
+		return ERROR;
 	}
 
 	if (listen(sock, 10) < 0) {
 		printf("listen error\n");
-		return -1;
+		return ERROR;
 	}
 
 	socklen_t sin_size = sizeof(struct sockaddr_in);
@@ -324,12 +331,12 @@ int initServer(int port) {
 		SOCKET s = accept(sock, (struct sockaddr *) (&client_addr), &sin_size);
 		if (s < 0) {
 			printf("Client accept error\n");
-			return -1;
+			return ERROR;
 		}
 
 		int status = serverProcess(s);
 		if (status < 0) {
-			return -1;
+			return ERROR;
 		} else if (status == QUIT || status == LOGIN_FAIL) {
 			continue;
 		} else
@@ -337,7 +344,7 @@ int initServer(int port) {
 
 	}
 
-	return 0;
+	return OK;
 
 }
 
@@ -358,7 +365,7 @@ int main(int argc, char* argv[]) {
 		status = createUsersList(argv[1]);
 		if (status < 0) {
 			printf("Failed to get users list\n");
-			return -1;
+			return ERROR;
 		}
 
 		for (int i = 0; i < lst.size; i++) {
@@ -370,14 +377,14 @@ int main(int argc, char* argv[]) {
 
 	default:
 		printf("Invalid arguments.\nTry: mail_server users_file [port]\n");
-		return -1;
+		return ERROR;
 
 	}
 
 	SOCKET s = initServer(port);
 	if (s < 0) {
 		printf("Server Error\n");
-		return -1;
+		return ERROR;
 	}
 
 	return status;

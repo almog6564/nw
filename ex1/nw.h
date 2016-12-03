@@ -74,6 +74,6 @@ typedef struct {
 	short userID;
 } ACTIVEUSER;
 
-#define UnknownCommand()    printf("Unknown Command\n");    return -1;
+#define UnknownCommand()    printf("Unknown Command\n");
 
 #endif

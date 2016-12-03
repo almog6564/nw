@@ -35,11 +35,11 @@ int getBuffer(SOCKET s, void* buff, int len) {
 		recvSize = recv(s, (void*) ((long) buff + tot), leftToRead, 0);
 		switch (recvSize) {
 		case -1:
-			return -1;
+			return ERROR;
 
 		case 0:
 			printf("Connection ended while receiving message\n");
-			return -1;
+			return ERROR;
 
 		default:
 			tot += recvSize;
@@ -92,11 +92,11 @@ int sendMessage(SOCKET s, MSG* message) {
 		switch (sent) {
 		case -1:
 			//error
-			return -1;
+			return ERROR;
 
 		case 0:
 			printf("Connection ended while sending message\n");
-			return 0;
+			return OK;
 
 		default:
 			tot += sent;
