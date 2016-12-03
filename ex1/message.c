@@ -8,6 +8,13 @@
 #include <string.h>
 #include "nw.h"
 
+/*
+ * This function gets a mail and prints its sender, recipients,
+ * subject and content
+ * param m	-	pointer to a mail
+ * return OK
+ */
+
 void printMail(MAIL* m) {
 	if (!m)
 		return;
@@ -25,6 +32,15 @@ void printMail(MAIL* m) {
 	printf("Text: %s\n", m->text);
 }
 
+/*
+ * This function gets a buffer and reads from it,
+ * param s	-	SOCKET of the connection
+ * param _buff - pointer to a buffer
+ * param len - size of buffer
+ * return ERROR if connection ends,
+ otherwise return OK
+ */
+
 int getBuffer(SOCKET s, void* buff, int len) {
 
 	int recvSize;
@@ -35,6 +51,7 @@ int getBuffer(SOCKET s, void* buff, int len) {
 		recvSize = recv(s, (void*) ((long) buff + tot), leftToRead, 0);
 		switch (recvSize) {
 		case -1:
+			printf("Receiving buffer failed");
 			return ERROR;
 
 		case 0:
@@ -51,6 +68,14 @@ int getBuffer(SOCKET s, void* buff, int len) {
 	return tot;
 }
 
+/*
+ * This function gets a message and reads its content
+ * param s	-	SOCKET of the connection
+ * param message - pointer to message from the client
+ * return ERROR if receiving the buffer failed or message is too long,
+ otherwise return OK
+ */
+
 int getMessage(SOCKET s, MSG* message) {
 	if (getBuffer(s, &message->opcode, LENGTH_SIZE) < 0)
 		return ERROR;
@@ -65,6 +90,14 @@ int getMessage(SOCKET s, MSG* message) {
 
 	return getBuffer(s, message->msg, message->length);
 }
+
+/*
+ * This function gets a message and sends it,
+ * param s	-	SOCKET of the connection
+ * param message - pointer to message for the client
+ * return ERROR if sending message failed,
+ otherwise return OK
+ */
 
 int sendMessage(SOCKET s, MSG* message) {
 
@@ -86,7 +119,7 @@ int sendMessage(SOCKET s, MSG* message) {
 
 		switch (sent) {
 		case -1:
-			//error
+			printf("Sending message failure\n");
 			return ERROR;
 
 		case 0:

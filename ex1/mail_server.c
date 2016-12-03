@@ -14,6 +14,13 @@
 USERLIST lst;
 ACTIVEUSER gUser;
 
+/*
+ * This function gets the path of the users list, extracts the usernames and
+ * passwords and inserts those parameters to each user in a users list.
+ * param path
+ * return ERROR if path incorrect or invalid format,
+ otherwise return OK
+ */
 int createUsersList(char* path) {
 	memset(&lst, 0, sizeof(lst));
 	char line[LINE_LEN];
@@ -23,6 +30,7 @@ int createUsersList(char* path) {
 		printf("Error while opening users file");
 		return ERROR;
 	}
+	// read line by line, and from each line extract the parameters into user in the list
 	while (fgets(line, sizeof(line), fp) != NULL && i < MAX_USERS) {
 		chk = sscanf(line, "%s %s", lst.list[i].username, lst.list[i].password);
 		if (chk < 2 || chk == EOF) {
@@ -36,6 +44,13 @@ int createUsersList(char* path) {
 	return OK;
 }
 
+/*
+ * This function gets the login message from the client and connects it
+ * param s	-	SOCKET of the connection
+ * return ERROR if sending error or connection ended,
+ otherwise return OK
+ */
+
 int login(SOCKET s) {
 	int i;
 	MSG logMsg, connected;
@@ -43,20 +58,21 @@ int login(SOCKET s) {
 	char username[MAX_LEN], password[MAX_LEN];
 	int status = getMessage(s, &logMsg);
 	if (status < 0) {
-		return ERROR; // ERROR
+		printf("Error receiving the login message\n");
+		return ERROR;
 	} else if (logMsg.opcode == QUIT)
 		return QUIT;
 
 	strcpy(username, logMsg.msg);
 	strcpy(password, logMsg.msg + strlen(username) + 1);
-
+	// search the users list for the specific user
 	for (i = 0; i < lst.size; i++) {
 		usr = lst.list[i];
 		if (strcmp(usr.username, username) == 0 && strcmp(usr.password,
 				password) == 0) {
 			break;
 		}
-		if (i == lst.size - 1) {
+		if (i == lst.size - 1) { // if didn't find the user send fail
 			MSG inv;
 			inv.opcode = LOGIN_FAIL;
 			inv.length = 0;
@@ -67,7 +83,7 @@ int login(SOCKET s) {
 			return LOGIN_FAIL;
 		}
 	}
-
+	// make the user as the active user
 	gUser.userID = i;
 	memcpy(&gUser.user, &lst.list[i], sizeof(USER));
 
@@ -80,6 +96,12 @@ int login(SOCKET s) {
 	return LOGIN_SUCCESS;
 
 }
+
+/*
+ * This function gets the mail needs to be deleted
+ * param mail
+ * return OK
+ */
 
 int isValidMail(MAIL* mail) {
 	if (strlen(mail->from) && strlen(mail->subject) && strlen(mail->text)
@@ -95,6 +117,14 @@ int isValidMail(MAIL* mail) {
 
 }
 
+/*
+ * This function sends the client a message for each mail it has in the inbox
+ * containing the mail_ID, the sender and the subject
+ * param s	-	SOCKET of the connection
+ * return ERROR if sending error
+ otherwise return OK
+ */
+
 int showInbox(SOCKET s) {
 	int mailid;
 
@@ -107,6 +137,7 @@ int showInbox(SOCKET s) {
 			return ERROR;
 		}
 	} else {
+		// find out how many Mails actually are in the inbox (and not deleted)
 		int mailCntr = 0;
 		for (mailid = 0; mailid < lst.inboxSizes[gUser.userID]; mailid++) {
 			if (lst.isMail[gUser.userID][mailid])
@@ -114,13 +145,14 @@ int showInbox(SOCKET s) {
 		}
 		MSG num;
 		num.opcode = SHOW_INBOX;
+		//send the number of messages to be sent
 		sprintf(num.msg, "%d", mailCntr);
 		num.length = strlen(num.msg) + 1;
 		if (sendMessage(s, &num) < 0) {
 			printf("Sending inbox to client failed\n");
 			return ERROR;
 		}
-
+		// send each message in the format as described before
 		for (mailid = 0; mailid <= lst.inboxSizes[gUser.userID]; mailid++) {
 			if (lst.isMail[gUser.userID][mailid]) {
 				MSG mailMSG;
@@ -141,6 +173,15 @@ int showInbox(SOCKET s) {
 	return OK;
 }
 
+/*
+ * This function gets a message containing the mail_id that the user wishes to get,
+ * copying the content from that mail and sending it back to the client
+ * param s	-	SOCKET of the connection
+ * param _getMailMsg - message from the client
+ * return ERROR if sending error,
+ otherwise return OK
+ */
+
 int getMail(SOCKET s, MSG* _getMailMsg) {
 	int mid;
 	MSG getMail = *_getMailMsg, mailMSG;
@@ -149,7 +190,7 @@ int getMail(SOCKET s, MSG* _getMailMsg) {
 	strcpy(mail_id, getMail.msg);
 	mid = atoi(mail_id) - 1; // mail_id-s start counting from 1 but are saved in array from 0
 
-	if (mid < 0 || !lst.inboxSizes[gUser.userID]) {
+	if (mid < 0 || !lst.inboxSizes[gUser.userID]) {//if the ID is illegal
 		mailMSG.length = 0;
 		mailMSG.opcode = INVALID;
 	} else {
@@ -159,11 +200,20 @@ int getMail(SOCKET s, MSG* _getMailMsg) {
 				sizeof(MAIL));
 	}
 	if (sendMessage(s, &mailMSG) < 0) {
-		printf("Sending the mail to server failed\n");
+		printf("Sending the mail to client failed\n");
 		return ERROR;
 	}
 	return OK;
 }
+
+/*
+ * This function gets a message containing a Mail composed by the user,
+ * copying the mail to each of the recipients' inbox
+ * param s	-	SOCKET of the connection
+ * param _mailMsg - message from the client
+ * return ERROR if sending error,
+ otherwise return OK
+ */
 
 int receiveMail(SOCKET s, MSG* _mailMsg) {
 	int i = 0, j = 0;
@@ -184,7 +234,10 @@ int receiveMail(SOCKET s, MSG* _mailMsg) {
 			} else if (j == lst.size - 1) {
 				opInval.opcode = INVALID;
 				opInval.length = 0;
-				sendMessage(s, &opInval);
+				if (sendMessage(s, &opInval)<0){
+					printf("Sending the Invalid MSG to client failed\n");
+					return ERROR;
+				}
 				break;
 			}
 		}
@@ -200,6 +253,15 @@ int receiveMail(SOCKET s, MSG* _mailMsg) {
 	}
 	return OK;
 }
+
+/*
+ * This function gets a message containing a Mail ID to be deleted,
+ * and then setting off its isMail flag followed by a message to the client
+ * param s	-	SOCKET of the connection
+ * param delmsg - message from the client
+ * return ERROR if sending error,
+ otherwise return OK
+ */
 
 int deleteMail(SOCKET s, MSG* delmsg) {
 	int mailID = atoi(delmsg->msg) - 1;
@@ -229,6 +291,14 @@ int deleteMail(SOCKET s, MSG* delmsg) {
 	return OK;
 
 }
+
+/*
+ * This function is called after the server is initialised,
+ * and it holds the logic and operations the server can execute
+ * param s	-	SOCKET of the connection
+ * return ERROR if sending error or one of the operations failed,
+ otherwise return OK
+ */
 
 int serverProcess(SOCKET s) {
 	MSG m;
@@ -304,6 +374,14 @@ int serverProcess(SOCKET s) {
 	return OK;
 }
 
+/*
+ * This function gets the port the server needs to listen to,
+ * and it initialises the server.
+ * param port
+ * return ERROR if socket error, binding error, listener error or acceptance error,
+ otherwise return OK
+ */
+
 int initServer(int port) {
 
 	SOCKET sock = socket(PF_INET, SOCK_STREAM, 0);
@@ -333,8 +411,6 @@ int initServer(int port) {
 	}
 
 	socklen_t sin_size = sizeof(struct sockaddr_in);
-
-	//maybe need to be in a loop:
 
 	while (1) { //Main client connecting loop. after a quit waits for another accept
 		SOCKET s = accept(sock, (struct sockaddr *) (&client_addr), &sin_size);
