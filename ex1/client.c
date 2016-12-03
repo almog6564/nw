@@ -165,13 +165,11 @@ int userLogin(SOCKET s) {
 	}
 
 	MSG loginStatus;
-
 	status = getMessage(s, &loginStatus);
 	if (status < 0) {
 		printf("Error while getting login status\n");
 		return ERROR;
 	}
-
 	if (loginStatus.opcode == LOGIN_SUCCESS) {
 		printf("Connected to server\n");
 		return LOGIN_SUCCESS;
@@ -202,9 +200,8 @@ int showInbox(SOCKET s) {
 		printf("Getting message command failed\n");
 		return ERROR;
 	}
-	if (inbox.opcode != SHOW_INBOX_NUM_OF_MAILS) {
-		printf("Invalid message\n");
-		return ERROR;
+	if(inbox.opcode != SHOW_INBOX){
+
 	}
 	if (inbox.length > 0) {
 		int numOfMails = atoi(inbox.msg);
@@ -214,7 +211,7 @@ int showInbox(SOCKET s) {
 				printf("Error while getting inbox message\n");
 				return ERROR;
 			}
-			if (inbox.opcode != SHOW_INBOX_ONE_MAIL) {
+			if (cur.opcode != SHOW_INBOX) {
 				printf("Invalid message\n");
 				return ERROR;
 			}

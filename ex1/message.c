@@ -52,14 +52,11 @@ int getBuffer(SOCKET s, void* buff, int len) {
 }
 
 int getMessage(SOCKET s, MSG* message) {
-
 	if (getBuffer(s, &message->opcode, LENGTH_SIZE) < 0)
 		return ERROR;
-
 	message->opcode = ntohs(message->opcode);
 	if (getBuffer(s, &message->length, LENGTH_SIZE) < 0)
 		return ERROR;
-
 	message->length = ntohs(message->length); //so it would be BIG endian
 
 	if (message->length > MAXSIZE) {
@@ -82,8 +79,6 @@ int sendMessage(SOCKET s, MSG* message) {
 	copy.length = htons(message->length);
 	memcpy(copy.msg, message->msg, message->length);
 
-	message->length = htons(message->length);
-	message->opcode = htons(message->opcode);
 
 	while (tot < sendSize) {
 

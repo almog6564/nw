@@ -77,7 +77,7 @@ int login(SOCKET s) {
 		printf("sendMessage error\n");
 		return ERROR;
 	}
-	return OK;
+	return LOGIN_SUCCESS;
 
 }
 
@@ -113,7 +113,7 @@ int showInbox(SOCKET s) {
 				mailCntr++;
 		}
 		MSG num;
-		num.opcode = SHOW_INBOX_NUM_OF_MAILS;
+		num.opcode = SHOW_INBOX;
 		sprintf(num.msg, "%d", mailCntr);
 		num.length = strlen(num.msg) + 1;
 		if (sendMessage(s, &num) < 0) {
@@ -124,7 +124,7 @@ int showInbox(SOCKET s) {
 		for (mailid = 0; mailid <= lst.inboxSizes[gUser.userID]; mailid++) {
 			if (lst.isMail[gUser.userID][mailid]) {
 				MSG mailMSG;
-				mailMSG.opcode = SHOW_INBOX_ONE_MAIL;
+				mailMSG.opcode = SHOW_INBOX;
 				sprintf(mailMSG.msg, "%d %s \"%s\"\n", mailid + 1,
 						lst.inbox[gUser.userID][mailid].from,
 						lst.inbox[gUser.userID][mailid].subject);
@@ -149,7 +149,7 @@ int getMail(SOCKET s, MSG* _getMailMsg) {
 	strcpy(mail_id, getMail.msg);
 	mid = atoi(mail_id) - 1; // mail_id-s start counting from 1 but are saved in array from 0
 
-	if (mid < 0 || !lst.isMail[gUser.userID][mid]) {
+	if (mid < 0 || !lst.inboxSizes[gUser.userID]) {
 		mailMSG.length = 0;
 		mailMSG.opcode = INVALID;
 	} else {
@@ -217,7 +217,7 @@ int deleteMail(SOCKET s, MSG* delmsg) {
 	//If mail doesnt exist it doesnt matter
 	//memset(&lst.inbox[gUser.userID][mailID], 0, sizeof(MAIL))
 	lst.isMail[gUser.userID][mailID] = 0;
-	if (mailID == lst.inboxSizes[gUser.userID])
+	if (mailID + 1 == lst.inboxSizes[gUser.userID])
 		lst.inboxSizes[gUser.userID]--;
 	MSG ok;
 	ok.opcode = DELETE_MAIL;
@@ -244,18 +244,21 @@ int serverProcess(SOCKET s) {
 		printf("Error while sending welcome message\n");
 		return ERROR;
 	}
+
 	while (1) {
 		int status = login(s);
-		if (status < 0) {
-			return LOGIN_FAIL;
+
+		if (status == LOGIN_SUCCESS) {
+			break;
 		} else if (status == LOGIN_FAIL) {
 			continue;
 		} else if (status == QUIT) {
 			memset(&gUser, 0, sizeof(ACTIVEUSER));
-			close(s);
 			return QUIT;
-		}
+		} else
+			return ERROR;
 	}
+
 	while (1) { //Main commands loop. suppose to continue until getting QUIT opcode
 		MSG get;
 		if (getMessage(s, &get) < 0) {
@@ -266,7 +269,6 @@ int serverProcess(SOCKET s) {
 
 		case QUIT:
 			memset(&gUser, 0, sizeof(ACTIVEUSER));
-			close(s);
 			return QUIT;
 
 		case SHOW_INBOX:
@@ -342,6 +344,10 @@ int initServer(int port) {
 		}
 
 		int status = serverProcess(s);
+		if (close(s) < 0) {
+			printf("Closing socket failed\n");
+			return ERROR;
+		}
 		if (status < 0) {
 			return ERROR;
 		} else if (status == QUIT || status == LOGIN_FAIL) {
