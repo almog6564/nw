@@ -17,14 +17,18 @@ ACTIVEUSER gUser;
 int createUsersList(char* path) {
 	memset(&lst, 0, sizeof(lst));
 	char line[LINE_LEN];
-	int i = 0;
+	int i = 0, chk;
 	FILE* fp = fopen(path, "r");
 	if (!fp) {
 		printf("Error while opening users file");
 		return ERROR;
 	}
 	while (fgets(line, sizeof(line), fp) != NULL && i < MAX_USERS) {
-		sscanf(line, "%s %s", lst.list[i].username, lst.list[i].password); // TODO Error?
+		chk = sscanf(line, "%s %s", lst.list[i].username, lst.list[i].password);
+		if (chk < 2 || chk == EOF) {
+			printf("Error while reading users file, invalid format\n");
+			return ERROR;
+		}
 		i++;
 		lst.size++;
 	}
@@ -60,7 +64,7 @@ int login(SOCKET s) {
 				printf("Error sending invalid message\n");
 				return ERROR;
 			}
-			return OK;
+			return LOGIN_FAIL;
 		}
 	}
 
@@ -109,7 +113,7 @@ int showInbox(SOCKET s) {
 				mailCntr++;
 		}
 		MSG num;
-		num.opcode = COMPOSE;
+		num.opcode = SHOW_INBOX_NUM_OF_MAILS;
 		sprintf(num.msg, "%d", mailCntr);
 		num.length = strlen(num.msg) + 1;
 		if (sendMessage(s, &num) < 0) {
@@ -120,7 +124,7 @@ int showInbox(SOCKET s) {
 		for (mailid = 0; mailid <= lst.inboxSizes[gUser.userID]; mailid++) {
 			if (lst.isMail[gUser.userID][mailid]) {
 				MSG mailMSG;
-				mailMSG.opcode = COMPOSE;
+				mailMSG.opcode = SHOW_INBOX_ONE_MAIL;
 				sprintf(mailMSG.msg, "%d %s \"%s\"\n", mailid + 1,
 						lst.inbox[gUser.userID][mailid].from,
 						lst.inbox[gUser.userID][mailid].subject);
@@ -240,15 +244,18 @@ int serverProcess(SOCKET s) {
 		printf("Error while sending welcome message\n");
 		return ERROR;
 	}
-	int status = login(s);
-	if (status < 0) {
-		return LOGIN_FAIL;
-	} else if (status == QUIT) {
-		memset(&gUser, 0, sizeof(ACTIVEUSER));
-		close(s);
-		return QUIT;
+	while (1) {
+		int status = login(s);
+		if (status < 0) {
+			return LOGIN_FAIL;
+		} else if (status == LOGIN_FAIL) {
+			continue;
+		} else if (status == QUIT) {
+			memset(&gUser, 0, sizeof(ACTIVEUSER));
+			close(s);
+			return QUIT;
+		}
 	}
-
 	while (1) { //Main commands loop. suppose to continue until getting QUIT opcode
 		MSG get;
 		if (getMessage(s, &get) < 0) {
@@ -354,7 +361,6 @@ int main(int argc, char* argv[]) {
 	memset(&gUser, 0, sizeof(ACTIVEUSER));
 
 	//check arguments
-	int status = 0;
 	int port = DEFAULT_PORT;
 	switch (argc) {
 
@@ -362,15 +368,8 @@ int main(int argc, char* argv[]) {
 		port = atoi(argv[2]);
 
 	case 2:
-		status = createUsersList(argv[1]);
-		if (status < 0) {
-			printf("Failed to get users list\n");
+		if (createUsersList(argv[1]) < 0) {
 			return ERROR;
-		}
-
-		for (int i = 0; i < lst.size; i++) {
-			printf("User: %s,\tPassword: %s\n", lst.list[i].username,
-					lst.list[i].password);
 		}
 
 		break;
@@ -387,6 +386,6 @@ int main(int argc, char* argv[]) {
 		return ERROR;
 	}
 
-	return status;
+	return OK;
 
 }

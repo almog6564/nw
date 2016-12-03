@@ -131,7 +131,7 @@ int userLogin(SOCKET s) {
 
 	if (!strncmp(input, "User: ", 6)) {
 		strcpy(username, input + 6);
-	} else if(!strcmp(input, "QUIT")){
+	} else if (!strcmp(input, "QUIT")) {
 		sendQuit(s);
 		return QUIT;
 	} else {
@@ -202,7 +202,7 @@ int showInbox(SOCKET s) {
 		printf("Getting message command failed\n");
 		return ERROR;
 	}
-	if (inbox.opcode != SHOW_INBOX) {
+	if (inbox.opcode != SHOW_INBOX_NUM_OF_MAILS) {
 		printf("Invalid message\n");
 		return ERROR;
 	}
@@ -212,6 +212,10 @@ int showInbox(SOCKET s) {
 			MSG cur;
 			if (getMessage(s, &cur) < 0) {
 				printf("Error while getting inbox message\n");
+				return ERROR;
+			}
+			if (inbox.opcode != SHOW_INBOX_ONE_MAIL) {
+				printf("Invalid message\n");
 				return ERROR;
 			}
 			printf("%s", cur.msg);
@@ -383,7 +387,7 @@ int clientProtocol(SOCKET s) {
 			break;
 		else if (status == LOGIN_FAIL)
 			continue;
-		else if(status == QUIT)
+		else if (status == QUIT)
 			return OK;
 		else
 			return ERROR;
@@ -435,13 +439,11 @@ int clientProtocol(SOCKET s) {
 int main(int argc, char* argv[]) {
 
 	char hostname[MAX_LEN];
-	int port = 0;
+	int port = DEFAULT_PORT;
 
 	switch (argc) {
 	case 1:
 		strcpy(hostname, HOST);
-		port = DEFAULT_PORT;
-
 		break;
 
 	case 3:
@@ -451,12 +453,11 @@ int main(int argc, char* argv[]) {
 
 	case 2:
 		strcpy(hostname, argv[1]);
-
 		break;
 
 	default:
 		INVALID: printf(
-				"Invalid arguments.\nUse: mail_client [hostname [port]]");
+				"Invalid arguments.\nUse: mail_client [hostname [port]]\n");
 		return ERROR;
 
 	}
