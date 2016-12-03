@@ -19,13 +19,8 @@
 #define MAX_COMPOSE_TO	(MAX_LEN+5)*TOTAL_TO
 #define OK 	  (0)
 #define ERROR (-1)
-typedef int SOCKET;
 
-typedef struct {
-	short opcode;
-	short length;
-	char msg[MAXSIZE];
-} MSG;
+typedef int SOCKET;
 
 typedef enum {
 
@@ -40,11 +35,13 @@ typedef enum {
 	COMPOSE,
 	QUIT,
 
-	OPCODE_COUNT
-
 } OPCODE;
 
-struct MAIL;
+typedef struct {
+	short opcode;
+	short length;
+	char msg[MAXSIZE];
+} MSG;
 
 #pragma pack(push,1)
 typedef struct {
@@ -77,5 +74,8 @@ typedef struct {
 } ACTIVEUSER;
 
 #define UnknownCommand()    printf("Unknown Command\n");
+
+//Macro for zeroing a variable
+#define ZERO(var)			memset(&var, 0, sizeof(var));
 
 #endif

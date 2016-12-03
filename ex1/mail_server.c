@@ -22,7 +22,7 @@ ACTIVEUSER gUser;
  otherwise return OK
  */
 int createUsersList(char* path) {
-	memset(&lst, 0, sizeof(lst));
+
 	char line[LINE_LEN];
 	int i = 0, chk;
 	FILE* fp = fopen(path, "r");
@@ -54,7 +54,11 @@ int createUsersList(char* path) {
 int login(SOCKET s) {
 	int i;
 	MSG logMsg, connected;
+	ZERO(logMsg)
+	ZERO(connected)
+
 	USER usr;
+	ZERO(usr)
 	char username[MAX_LEN], password[MAX_LEN];
 	int status = getMessage(s, &logMsg);
 	if (status < 0) {
@@ -98,38 +102,18 @@ int login(SOCKET s) {
 }
 
 /*
- * This function gets the mail needs to be deleted
- * param mail
- * return OK
- */
-
-int isValidMail(MAIL* mail) {
-	if (strlen(mail->from) && strlen(mail->subject) && strlen(mail->text)
-			&& mail->toLen > 0) {
-		for (int i = 0; i < mail->toLen; i++) {
-			if (!strlen(mail->to[i])) {
-				return OK;
-			}
-		}
-		return 1;
-	}
-	return OK;
-
-}
-
-/*
  * This function sends the client a message for each mail it has in the inbox
  * containing the mail_ID, the sender and the subject
  * param s	-	SOCKET of the connection
  * return ERROR if sending error
  otherwise return OK
  */
-
 int showInbox(SOCKET s) {
 	int mailid;
 
 	if (!lst.inboxSizes[gUser.userID]) {
 		MSG inbox;
+		ZERO(inbox)
 		inbox.opcode = SHOW_INBOX;
 		inbox.length = 0;
 		if (sendMessage(s, &inbox) < 0) {
@@ -144,6 +128,7 @@ int showInbox(SOCKET s) {
 				mailCntr++;
 		}
 		MSG num;
+		ZERO(num)
 		num.opcode = SHOW_INBOX;
 		//send the number of messages to be sent
 		sprintf(num.msg, "%d", mailCntr);
@@ -156,6 +141,7 @@ int showInbox(SOCKET s) {
 		for (mailid = 0; mailid <= lst.inboxSizes[gUser.userID]; mailid++) {
 			if (lst.isMail[gUser.userID][mailid]) {
 				MSG mailMSG;
+				ZERO(mailMSG)
 				mailMSG.opcode = SHOW_INBOX;
 				sprintf(mailMSG.msg, "%d %s \"%s\"\n", mailid + 1,
 						lst.inbox[gUser.userID][mailid].from,
@@ -185,6 +171,7 @@ int showInbox(SOCKET s) {
 int getMail(SOCKET s, MSG* _getMailMsg) {
 	int mid;
 	MSG getMail = *_getMailMsg, mailMSG;
+	ZERO(mailMSG)
 	char mail_id[MAX_LEN];
 
 	strcpy(mail_id, getMail.msg);
@@ -221,6 +208,10 @@ int receiveMail(SOCKET s, MSG* _mailMsg) {
 	MSG mailSent, opInval;
 	MSG mailMsg = *_mailMsg;
 
+	ZERO(mail)
+	ZERO(mailSent)
+	ZERO(opInval)
+
 	memcpy(&mail, (MAIL*) mailMsg.msg, sizeof(MAIL));
 	//extract the parameters of the mail from the msg
 	for (; i < mail.toLen; i++) {
@@ -234,7 +225,7 @@ int receiveMail(SOCKET s, MSG* _mailMsg) {
 			} else if (j == lst.size - 1) {
 				opInval.opcode = INVALID;
 				opInval.length = 0;
-				if (sendMessage(s, &opInval)<0){
+				if (sendMessage(s, &opInval) < 0) {
 					printf("Sending the Invalid MSG to client failed\n");
 					return ERROR;
 				}
@@ -267,6 +258,7 @@ int deleteMail(SOCKET s, MSG* delmsg) {
 	int mailID = atoi(delmsg->msg) - 1;
 	if (mailID < 0 || mailID > MAXMAILS) {
 		MSG inv;
+		ZERO(inv)
 		inv.opcode = INVALID;
 		inv.length = 0;
 		if (sendMessage(s, &inv) < 0) {
@@ -277,11 +269,11 @@ int deleteMail(SOCKET s, MSG* delmsg) {
 
 	//Deleting:
 	//If mail doesnt exist it doesnt matter
-	//memset(&lst.inbox[gUser.userID][mailID], 0, sizeof(MAIL))
 	lst.isMail[gUser.userID][mailID] = 0;
 	if (mailID + 1 == lst.inboxSizes[gUser.userID])
 		lst.inboxSizes[gUser.userID]--;
 	MSG ok;
+	ZERO(ok)
 	ok.opcode = DELETE_MAIL;
 	ok.length = 0;
 	if (sendMessage(s, &ok) < 0) {
@@ -302,7 +294,7 @@ int deleteMail(SOCKET s, MSG* delmsg) {
 
 int serverProcess(SOCKET s) {
 	MSG m;
-
+	ZERO(m)
 	//welcome and login will always be on the start
 
 	m.length = WELCOME_SIZE;
@@ -331,6 +323,7 @@ int serverProcess(SOCKET s) {
 
 	while (1) { //Main commands loop. suppose to continue until getting QUIT opcode
 		MSG get;
+		ZERO(get)
 		if (getMessage(s, &get) < 0) {
 			printf("Error while getting message on server\n");
 			return ERROR;
@@ -338,7 +331,7 @@ int serverProcess(SOCKET s) {
 		switch (get.opcode) {
 
 		case QUIT:
-			memset(&gUser, 0, sizeof(ACTIVEUSER));
+			ZERO(gUser)
 			return QUIT;
 
 		case SHOW_INBOX:
@@ -368,6 +361,9 @@ int serverProcess(SOCKET s) {
 				return ERROR;
 			}
 			break;
+		default:
+			printf("Invalid command in message. Aborting...\n");
+			return ERROR;
 		}
 	}
 
@@ -439,8 +435,8 @@ int initServer(int port) {
 
 int main(int argc, char* argv[]) {
 
-	memset(&lst, 0, sizeof(lst));
-	memset(&gUser, 0, sizeof(ACTIVEUSER));
+	ZERO(lst)
+	ZERO(gUser)
 
 	//check arguments
 	int port = DEFAULT_PORT;
